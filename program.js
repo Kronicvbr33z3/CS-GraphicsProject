@@ -159,7 +159,7 @@ let canvas = document.getElementById( 'the-canvas' );
             const ROTATION_SPEED = 0.2; // eighth turn per second
             const ROTATION_SPEED_PER_FRAME = ROTATION_SPEED / DESIRED_TICK_RATE;
 
-            const FLY_SPEED = 2.5;    // units per second
+            const FLY_SPEED = 2;    // units per second
             const FLY_SPEED_PER_FRAME = FLY_SPEED / DESIRED_TICK_RATE;
 
             let keys = Keys.start_listening();
@@ -220,6 +220,18 @@ let canvas = document.getElementById( 'the-canvas' );
             const SPHERE_ROTATION_SPEED = 2 / DESIRED_TICK_RATE;
             const SPHERE_ORBIT_RADIUS = 0.8;
 
+            let terrain_material = 
+                new LitMaterial(gl, 'tex/grass_lawn_seamless.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
+            let track_material = 
+                new LitMaterial(gl, 'tex/pebbles_seamless.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
+
+            let terrainGen = new TerrainGenerator(gl, lit_program, 100, 128, [terrain_material, track_material]);
+            let terrain_node = terrainGen.createTerrainNode();
+            terrain_node.position.y = -2;
+            scene_root.addChild(terrain_node);
+
+            cam.translate(0, 5, -10);
+
             function render( now ) {
                 last_update = now;
 
@@ -262,6 +274,10 @@ let canvas = document.getElementById( 'the-canvas' );
                 'ArrowRight': function() { cam.add_yaw( ROTATION_SPEED_PER_FRAME ); },
                 'ArrowUp': function() { cam.add_pitch( -ROTATION_SPEED_PER_FRAME ); },
                 'ArrowDown': function() { cam.add_pitch( ROTATION_SPEED_PER_FRAME ); },
+                'KeyT': function() { 
+                    let camPos = new Vec4(cam.x, cam.y, cam.z, 1);
+                    terrainGen.updateTerrain(camPos);
+                },
             };
 
             function update() {

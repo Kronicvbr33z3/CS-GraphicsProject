@@ -1,4 +1,3 @@
-
 class Keys {
     constructor() {
         this.keys_down = {}
@@ -14,16 +13,21 @@ class Keys {
         let keys = new Keys();
 
         addEventListener( 'keydown', function( ev ) {
-            // console.log( ev.code );
-            // use the keycode, not the text, to determine behavior.
-            // this prevents users in France from having to 
-            // hunt around the keyboard for W-A-S-D
+            // Prevent default behavior for arrow keys and space
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(ev.code)) {
+                ev.preventDefault();
+            }
+            
             if( typeof ev.code === 'string' ) {
                 keys.keys_down[ ev.code ] = true;
             }
         } );
 
         addEventListener( 'keyup', function( ev ) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(ev.code)) {
+                ev.preventDefault();
+            }
+            
             if( typeof ev.code === 'string' ) {
                 keys.keys_down[ ev.code ] = false;
             }
