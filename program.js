@@ -203,7 +203,9 @@ let canvas = document.getElementById( 'the-canvas' );
 
             let keys = Keys.start_listening();
             let cam = new Camera();
-            cam.translate( 0, 0, -4.5 );
+            cam.translate( 0, 0, -7.5 );
+    
+            
 
             let metal = new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.5, 1.0, 0.9, 20 );
             let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
@@ -245,7 +247,8 @@ let canvas = document.getElementById( 'the-canvas' );
                     const carNode = new Node(carMesh);
                     carNode.position = { x: 0, y: -1.8, z: 0 }; 
                     carNode.scale = { x: 0.3, y: 0.3, z: 0.3 };
-                    carNode.rotation.pitch = -Math.PI / 2;
+                    carNode.rotation.yaw = Math.PI / 3.15;
+                    
                     scene_root.addChild(carNode);
                     
                 } catch (error) {
