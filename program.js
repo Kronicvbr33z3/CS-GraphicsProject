@@ -238,7 +238,8 @@ let canvas = document.getElementById( 'the-canvas' );
 
             let keys = Keys.start_listening();
             let cam = new Camera();
-            cam.translate( 0, 0, -7.5 );
+            cam.translate( 0, -1.5, -5 );
+            cam.add_roll(Math.PI*2);
     
             
 
@@ -246,6 +247,9 @@ let canvas = document.getElementById( 'the-canvas' );
             let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
             let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
             let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.5, 1.0, 0.3, 1.0);
+
+            // Initialize skybox
+            let skybox = new Skybox(gl, 'tex/Skybox.png');
 
             let sun_dir = (new Vec4(0.2, 0.3, 0.5, 0.0)).norm();
             let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.4, 0.6, 0);
@@ -321,6 +325,15 @@ let canvas = document.getElementById( 'the-canvas' );
                 gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
 
                 let view = cam.get_view_matrix();
+                
+                // Update projection matrix with larger far plane
+                let aspect = canvas.width / canvas.height;
+                let projection = Mat4.perspective(Math.PI / 4, aspect, 0.1, 10000.0);
+                
+                // Draw skybox first
+                gl.depthMask(false);
+                skybox.render(gl, projection.data, view.data);
+                gl.depthMask(true);
 
                 let render_jobs = generateRenderJobs( Mat4.identity(), scene_root );
 
@@ -365,19 +378,23 @@ let canvas = document.getElementById( 'the-canvas' );
                     
                     // Update headlight positions relative to car position
                     leftHeadlight.x = carPosition.x - 0.4;
-                    leftHeadlight.y = carPosition.y - 1.2;     // Raised from -1.4 to -1.2
-                    leftHeadlight.z = carPosition.z + 6.0;     // Increased forward distance from 4.0 to 6.0
+                    leftHeadlight.y = carPosition.y - 1.2;
+                    leftHeadlight.z = carPosition.z + 6.0;
 
                     rightHeadlight.x = carPosition.x + 0.4;
-                    rightHeadlight.y = carPosition.y - 1.2;    // Raised from -1.4 to -1.2
-                    rightHeadlight.z = carPosition.z + 6.0;    // Increased forward distance from 4.0 to 6.0
+                    rightHeadlight.y = carPosition.y - 1.2;
+                    rightHeadlight.z = carPosition.z + 6.0;
                     
                     // Update camera position to follow car
                     cam.warp(
-                        carPosition.x,      // Same X as car
-                        carPosition.y + 2,  // Slightly above car
-                        carPosition.z - 7.5 // Behind car
+                        carPosition.x,          // Same X as car
+                        carPosition.y + 3.5,      // Above car
+                        carPosition.z - 6.5      // Behind car
                     );
+
+
+                   
+          
                 }
 
                 // Process other key inputs
