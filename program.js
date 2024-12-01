@@ -1,9 +1,9 @@
-let canvas = document.getElementById( 'the-canvas' );
-            /** @type {WebGLRenderingContext} */
-            let gl = canvas.getContext( 'webgl2' );
+let canvas = document.getElementById('the-canvas');
+/** @type {WebGLRenderingContext} */
+let gl = canvas.getContext('webgl2');
 
-            const GOURAUD_VERTEX_SHADER = 
-            `   #version 300 es
+const GOURAUD_VERTEX_SHADER =
+    `   #version 300 es
                 precision mediump float;
 
                 uniform mat4 projection;
@@ -183,8 +183,8 @@ let canvas = document.getElementById( 'the-canvas' );
                 }
             `;
 
-            const GOURAUD_FRAGMENT_SHADER = 
-            `   #version 300 es
+const GOURAUD_FRAGMENT_SHADER =
+    `   #version 300 es
                 precision mediump float;
 
                 in vec4 v_color;
@@ -222,268 +222,261 @@ let canvas = document.getElementById( 'the-canvas' );
                 }
             `;
 
-            let lit_program = 
-                create_compile_and_link_program( 
-                    gl, 
+let lit_program =
+    create_compile_and_link_program(
+        gl,
                     /*PHONG_VERTEX_SHADER,*/ GOURAUD_VERTEX_SHADER,
                     /*PHONG_FRAGMENT_SHADER,*/ GOURAUD_FRAGMENT_SHADER
-                );
+    );
 
-            gl.useProgram( lit_program );
+gl.useProgram(lit_program);
 
-            set_render_params( gl );
+set_render_params(gl);
 
-            let last_update = performance.now();
+let last_update = performance.now();
 
-            const DESIRED_TICK_RATE = 60;
-            const DESIRED_MSPT = 1000.0 / DESIRED_TICK_RATE;
+const DESIRED_TICK_RATE = 60;
+const DESIRED_MSPT = 1000.0 / DESIRED_TICK_RATE;
 
-            const ROTATION_SPEED = 0.2; // eighth turn per second
-            const ROTATION_SPEED_PER_FRAME = ROTATION_SPEED / DESIRED_TICK_RATE;
+const ROTATION_SPEED = 0.2; // eighth turn per second
+const ROTATION_SPEED_PER_FRAME = ROTATION_SPEED / DESIRED_TICK_RATE;
 
-            const FLY_SPEED = 10;    // units per second
-            const FLY_SPEED_PER_FRAME = FLY_SPEED / DESIRED_TICK_RATE;
+const FLY_SPEED = 10;    // units per second
+const FLY_SPEED_PER_FRAME = FLY_SPEED / DESIRED_TICK_RATE;
 
-            const CAR_SPEED = 5.0;  // units per second
-            const CAR_SPEED_PER_FRAME = CAR_SPEED / DESIRED_TICK_RATE;
+const CAR_SPEED = 5.0;  // units per second
+const CAR_SPEED_PER_FRAME = CAR_SPEED / DESIRED_TICK_RATE;
 
-            let keys = Keys.start_listening();
-            let cam = new Camera();
-            cam.translate( 0, -1.5, -5 );
-            cam.add_roll(Math.PI*2);
-    
-            
-
-            let metal = new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.5, 1.0, 0.9, 20 );
-            let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
-            let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
-            let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.5, 1.0, 0.3, 1.0);
-
-            // Initialize skybox
-            let skybox = new Skybox(gl, 'tex/Skybox.png');
-
-            let sun_dir = (new Vec4(0.2, 0.3, 0.5, 0.0)).norm();
-            let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.4, 0.6, 0);
-            let light1 = new Light(0, 4, 4, 0.6, 0.2, 0.8, 1);
-            let carSpotlight = new Light(0, 4, 4, 0.8, 0.2, 1.0, 2);
-            let leftHeadlight = new Light(-0.4, -1.2, -15, 0.8, 0.7, 0.2, 3);   // Raised height from -1.7 to -1.2
-            let rightHeadlight = new Light(0.4, -1.2, -15, 0.8, 0.7, 0.2, 4);   // Raised height from -1.7 to -1.2
-
-            let scene_root = new Node();
-
-            let carNode = null;  // Reference to the car node
-            let carPosition = { x: 0, y: -1.8, z: 0 };  // Initial car position
-
-            const NUM_SHOOTING_STARS = 5;
-            let shootingStars = [];
-            let shootingStarsRoot = new Node();
-            scene_root.addChild(shootingStarsRoot);
-
-            // Initialize shooting stars after carPosition is defined
-            for (let i = 0; i < NUM_SHOOTING_STARS; i++) {
-                const star = new ShootingStar(gl, lit_program);
-                star.reset(carPosition); // Now carPosition exists
-                shootingStars.push(star);
-                shootingStarsRoot.addChild(star.node);
-            }
-
-            async function loadCarModel() {
-                try {
-                    const mtlResponse = await fetch('model/CarritoVaporwave.mtl');
-                    const mtlData = await mtlResponse.text();
-                    
-                    const objResponse = await fetch('model/CarritoVaporwave.obj');
-                    const objData = await objResponse.text();
-                    
-                    const defaultMaterialProps = {
-                        ambient: 0.3,
-                        diffuse: 0.1,
-                        specular: 0.3,
-                        shininess: 16
-                    };
-                    
-                    const carMesh = await NormalMesh.from_obj_with_mtl(
-                        gl,
-                        lit_program,
-                        objData,
-                        mtlData,
-                        'model',
-                        defaultMaterialProps
-                    );
-                    
-                    carNode = new Node(carMesh);
-                    carNode.position = carPosition;
-                    carNode.scale = { x: 0.3, y: 0.3, z: 0.3 };
-                    carNode.rotation.yaw = Math.PI / 3.15;
-                    
-                    scene_root.addChild(carNode);
-                    
-                } catch (error) {
-                    console.error('Error loading car model:', error);
-                }
-            }
-
-            let terrainGen = new TerrainGenerator(gl, lit_program, 20, 128, [sand, ground, snow]);
-            let terrain_root = new Node();
-            scene_root.addChild(terrain_root);
-
-            let initialSegments = terrainGen.updateTerrain({x: 0, y: 0, z: 0});
-            initialSegments.forEach(segment => terrain_root.addChild(segment));
-
-            loadCarModel();
-
-            let projection = Mat4.perspective_fovx(0.125, 4 / 3, 0.125, 1024);
-            let current_program = lit_program;
-
-            let arm_rotation = 0;
-            let sphere_rotation = 0;
-            const ARM_ROTATION_SPEED = 0.5 / DESIRED_TICK_RATE;
-            const SPHERE_ROTATION_SPEED = 2 / DESIRED_TICK_RATE;
-            const SPHERE_ORBIT_RADIUS = 0.8;
-
-            function render( now ) {
-                last_update = now;
-
-                requestAnimationFrame( render );
-                
-                gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
-
-                let view = cam.get_view_matrix();
-                let aspect = canvas.width / canvas.height;
-                let projection = Mat4.perspective(Math.PI / 4, aspect, 0.1, 10000.0);
-                
-                // Draw skybox first
-                gl.depthMask(false);
-                skybox.render(gl, projection.data, view.data);
-                gl.depthMask(true);
-
-                let render_jobs = generateRenderJobs( Mat4.identity(), scene_root );
-
-                // First render regular scene
-                gl.disable(gl.BLEND);
-                gl.depthMask(true);
-                
-                // Render regular objects
-                let regular_jobs = render_jobs.filter(job => 
-                    !(job.mesh === shootingStars[0].mesh));
-                
-                for(let job of regular_jobs) {
-                    let modelview = view.mul(job.matrix);
-                    
-                    gl.useProgram(current_program);
-                    
-                    set_uniform_matrix4(gl, current_program, 'projection', projection.data);
-                    set_uniform_matrix4(gl, current_program, 'modelview', modelview.data);
-                    set_uniform_matrix4(gl, current_program, 'model', job.matrix.data);
-                    set_uniform_matrix4(gl, current_program, 'view', view.data);
-                    set_uniform_vec3(gl, current_program, 'viewer_loc', cam.x, cam.y, cam.z);
-
-                    sun.bind(gl, current_program, modelview);
-                    light1.bind(gl, current_program, modelview);
-                    carSpotlight.bind(gl, current_program, modelview);
-                    leftHeadlight.bind(gl, current_program, modelview);
-                    rightHeadlight.bind(gl, current_program, modelview);
-
-                    job.mesh.render(gl);
-                }
-
-                // Then render shooting stars with additive blending
-                gl.enable(gl.BLEND);
-                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // Changed to normal alpha blending
-                gl.depthMask(false);
-
-                let star_jobs = render_jobs.filter(job => 
-                    job.mesh === shootingStars[0].mesh);
-                
-                for(let job of star_jobs) {
-                    let modelview = view.mul(job.matrix);
-                    
-                    gl.useProgram(current_program);
-                    
-                    set_uniform_matrix4(gl, current_program, 'projection', projection.data);
-                    set_uniform_matrix4(gl, current_program, 'modelview', modelview.data);
-                    set_uniform_matrix4(gl, current_program, 'model', job.matrix.data);
-                    set_uniform_matrix4(gl, current_program, 'view', view.data);
-                    
-                    // Don't set any lighting uniforms for stars
-                    set_uniform_vec3(gl, current_program, 'sun_color', 0, 0, 0);
-                    set_uniform_vec3(gl, current_program, 'light1_color', 0, 0, 0);
-                    set_uniform_vec3(gl, current_program, 'light2_color', 0, 0, 0);
-                    set_uniform_vec3(gl, current_program, 'light3_color', 0, 0, 0);
-                    set_uniform_vec3(gl, current_program, 'light4_color', 0, 0, 0);
-
-                    job.mesh.render(gl);
-                }
-
-                // Reset state
-                gl.disable(gl.BLEND);
-                gl.depthMask(true);
-            }
-
-            const KEYMAP = {
-                'KeyQ': function() { cam.add_roll( -ROTATION_SPEED_PER_FRAME ); },
-                'KeyE': function() { cam.add_roll( ROTATION_SPEED_PER_FRAME ); },
-                'KeyT': function() { 
-                    let camPos = new Vec4(cam.x, cam.y, cam.z, 1);
-                    terrainGen.updateTerrain(camPos);
-                },
-            };
-
-            function update() {
-                let keys_down = keys.keys_down_list();
-
-                // Update car position - move forward in the direction it's facing
-                if (carNode) {
-                    // Move car forward
-                    carPosition.z += CAR_SPEED_PER_FRAME;
-                    carNode.position = carPosition;
-                    
-                    // Update headlight positions relative to car position
-                    leftHeadlight.x = carPosition.x - 0.4;
-                    leftHeadlight.y = carPosition.y - 1.2;
-                    leftHeadlight.z = carPosition.z + 6.0;
-
-                    rightHeadlight.x = carPosition.x + 0.4;
-                    rightHeadlight.y = carPosition.y - 1.2;
-                    rightHeadlight.z = carPosition.z + 6.0;
-                    
-                    // Update camera position to follow car
-                    cam.warp(
-                        carPosition.x,          // Same X as car
-                        carPosition.y + 3.5,      // Above car
-                        carPosition.z - 6.5      // Behind car
-                    );
+let keys = Keys.start_listening();
+let cam = new Camera();
+cam.translate(0, -1.5, -5);
+cam.add_roll(Math.PI * 2);
 
 
-                   
-          
-                }
 
-                // Process other key inputs
-                for (const key of keys_down) {
-                    let bound_function = KEYMAP[key];
-                    if (bound_function) {
-                        bound_function();
-                    }
-                }
+let metal = new LitMaterial(gl, 'tex/metal.png', gl.LINEAR, 0.5, 1.0, 0.9, 20);
+let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
+let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
+let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.5, 1.0, 0.3, 1.0);
 
-                let camPos = {x: cam.x, y: cam.y, z: cam.z};
-                let newSegments = terrainGen.updateTerrain(camPos);
-                
-                while(terrain_root.children.length > 0) {
-                    terrain_root.removeChild(terrain_root.children[0]);
-                }
-                
-                newSegments.forEach(segment => terrain_root.addChild(segment));
+// Initialize skybox
+let skybox = new Skybox(gl, 'tex/Skybox.png');
 
-                // Update shooting stars
-                const deltaTime = 1.0 / DESIRED_TICK_RATE;
-                shootingStars.forEach(star => {
-                    star.update(deltaTime, carPosition);
-                });
+let sun_dir = (new Vec4(0.2, 0.3, 0.5, 0.0)).norm();
+let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.4, 0.6, 0);
+let light1 = new Light(0, 4, 4, 0.6, 0.2, 0.8, 1);
+let carSpotlight = new Light(0, 4, 4, 0.8, 0.2, 1.0, 2);
+let leftHeadlight = new Light(-0.4, -1.2, -15, 0.8, 0.7, 0.2, 3);
+let rightHeadlight = new Light(0.4, -1.2, -15, 0.8, 0.7, 0.2, 4);
 
-                return;
-            }
-            
-            requestAnimationFrame( render );
-            setInterval( update, DESIRED_MSPT );
+let scene_root = new Node();
+
+let carNode = null;
+let carPosition = { x: 0, y: -1.8, z: 0 };
+
+const NUM_SHOOTING_STARS = 5;
+let shootingStars = [];
+let shootingStarsRoot = new Node();
+scene_root.addChild(shootingStarsRoot);
+
+
+for (let i = 0; i < NUM_SHOOTING_STARS; i++) {
+    const star = new ShootingStar(gl, lit_program);
+    star.reset(carPosition);
+    shootingStars.push(star);
+    shootingStarsRoot.addChild(star.node);
+}
+
+async function loadCarModel() {
+    try {
+        const mtlResponse = await fetch('model/CarritoVaporwave.mtl');
+        const mtlData = await mtlResponse.text();
+
+        const objResponse = await fetch('model/CarritoVaporwave.obj');
+        const objData = await objResponse.text();
+
+        const defaultMaterialProps = {
+            ambient: 0.3,
+            diffuse: 0.1,
+            specular: 0.3,
+            shininess: 16
+        };
+
+        const carMesh = await NormalMesh.from_obj_with_mtl(
+            gl,
+            lit_program,
+            objData,
+            mtlData,
+            'model',
+            defaultMaterialProps
+        );
+
+        carNode = new Node(carMesh);
+        carNode.position = carPosition;
+        carNode.scale = { x: 0.3, y: 0.3, z: 0.3 };
+        carNode.rotation.yaw = Math.PI / 3.15;
+
+        scene_root.addChild(carNode);
+
+    } catch (error) {
+        console.error('Error loading car model:', error);
+    }
+}
+
+let terrainGen = new TerrainGenerator(gl, lit_program, 20, 128, [sand, ground, snow]);
+let terrain_root = new Node();
+scene_root.addChild(terrain_root);
+
+let initialSegments = terrainGen.updateTerrain({ x: 0, y: 0, z: 0 });
+initialSegments.forEach(segment => terrain_root.addChild(segment));
+
+loadCarModel();
+
+let projection = Mat4.perspective_fovx(0.125, 4 / 3, 0.125, 1024);
+let current_program = lit_program;
+
+let arm_rotation = 0;
+let sphere_rotation = 0;
+const ARM_ROTATION_SPEED = 0.5 / DESIRED_TICK_RATE;
+const SPHERE_ROTATION_SPEED = 2 / DESIRED_TICK_RATE;
+const SPHERE_ORBIT_RADIUS = 0.8;
+
+function render(now) {
+    last_update = now;
+
+    requestAnimationFrame(render);
+
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    let view = cam.get_view_matrix();
+    let aspect = canvas.width / canvas.height;
+    let projection = Mat4.perspective(Math.PI / 4, aspect, 0.1, 10000.0);
+
+    // Draw skybox first
+    gl.depthMask(false);
+    skybox.render(gl, projection.data, view.data);
+    gl.depthMask(true);
+
+    let render_jobs = generateRenderJobs(Mat4.identity(), scene_root);
+
+    // First render regular scene
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
+
+    // Render regular objects
+    let regular_jobs = render_jobs.filter(job =>
+        !(job.mesh === shootingStars[0].mesh));
+
+    for (let job of regular_jobs) {
+        let modelview = view.mul(job.matrix);
+
+        gl.useProgram(current_program);
+
+        set_uniform_matrix4(gl, current_program, 'projection', projection.data);
+        set_uniform_matrix4(gl, current_program, 'modelview', modelview.data);
+        set_uniform_matrix4(gl, current_program, 'model', job.matrix.data);
+        set_uniform_matrix4(gl, current_program, 'view', view.data);
+        set_uniform_vec3(gl, current_program, 'viewer_loc', cam.x, cam.y, cam.z);
+
+        sun.bind(gl, current_program, modelview);
+        light1.bind(gl, current_program, modelview);
+        carSpotlight.bind(gl, current_program, modelview);
+        leftHeadlight.bind(gl, current_program, modelview);
+        rightHeadlight.bind(gl, current_program, modelview);
+
+        job.mesh.render(gl);
+    }
+
+    // Then render shooting stars with additive blending
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+
+    let star_jobs = render_jobs.filter(job =>
+        job.mesh === shootingStars[0].mesh);
+
+    for (let job of star_jobs) {
+        let modelview = view.mul(job.matrix);
+
+        gl.useProgram(current_program);
+
+        set_uniform_matrix4(gl, current_program, 'projection', projection.data);
+        set_uniform_matrix4(gl, current_program, 'modelview', modelview.data);
+        set_uniform_matrix4(gl, current_program, 'model', job.matrix.data);
+        set_uniform_matrix4(gl, current_program, 'view', view.data);
+
+
+        set_uniform_vec3(gl, current_program, 'sun_color', 0, 0, 0);
+        set_uniform_vec3(gl, current_program, 'light1_color', 0, 0, 0);
+        set_uniform_vec3(gl, current_program, 'light2_color', 0, 0, 0);
+        set_uniform_vec3(gl, current_program, 'light3_color', 0, 0, 0);
+        set_uniform_vec3(gl, current_program, 'light4_color', 0, 0, 0);
+
+        job.mesh.render(gl);
+    }
+
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
+}
+
+const KEYMAP = {
+    'KeyQ': function () { cam.add_roll(-ROTATION_SPEED_PER_FRAME); },
+    'KeyE': function () { cam.add_roll(ROTATION_SPEED_PER_FRAME); },
+    'KeyT': function () {
+        let camPos = new Vec4(cam.x, cam.y, cam.z, 1);
+        terrainGen.updateTerrain(camPos);
+    },
+};
+
+function update() {
+    let keys_down = keys.keys_down_list();
+
+    if (carNode) {
+
+        carPosition.z += CAR_SPEED_PER_FRAME;
+        carNode.position = carPosition;
+
+        leftHeadlight.x = carPosition.x - 0.4;
+        leftHeadlight.y = carPosition.y - 1.2;
+        leftHeadlight.z = carPosition.z + 6.0;
+
+        rightHeadlight.x = carPosition.x + 0.4;
+        rightHeadlight.y = carPosition.y - 1.2;
+        rightHeadlight.z = carPosition.z + 6.0;
+
+        cam.warp(
+            carPosition.x,
+            carPosition.y + 3.5,
+            carPosition.z - 6.5
+        );
+
+
+
+
+    }
+
+    for (const key of keys_down) {
+        let bound_function = KEYMAP[key];
+        if (bound_function) {
+            bound_function();
+        }
+    }
+
+    let camPos = { x: cam.x, y: cam.y, z: cam.z };
+    let newSegments = terrainGen.updateTerrain(camPos);
+
+    while (terrain_root.children.length > 0) {
+        terrain_root.removeChild(terrain_root.children[0]);
+    }
+
+    newSegments.forEach(segment => terrain_root.addChild(segment));
+    const deltaTime = 1.0 / DESIRED_TICK_RATE;
+    shootingStars.forEach(star => {
+        star.update(deltaTime, carPosition);
+    });
+
+    return;
+}
+
+requestAnimationFrame(render);
+setInterval(update, DESIRED_MSPT);

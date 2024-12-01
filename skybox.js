@@ -2,14 +2,14 @@ class Skybox {
     constructor(gl, image_url) {
         // Create vertex data for a cube
         this.vertices = new Float32Array([
-            -1.0,  1.0, -1.0,
+            -1.0, 1.0, -1.0,
             -1.0, -1.0, -1.0,
-             1.0, -1.0, -1.0,
-             1.0,  1.0, -1.0,
-            -1.0,  1.0,  1.0,
-            -1.0, -1.0,  1.0,
-             1.0, -1.0,  1.0,
-             1.0,  1.0,  1.0,
+            1.0, -1.0, -1.0,
+            1.0, 1.0, -1.0,
+            -1.0, 1.0, 1.0,
+            -1.0, -1.0, 1.0,
+            1.0, -1.0, 1.0,
+            1.0, 1.0, 1.0,
         ]);
 
         this.indices = new Uint16Array([
@@ -32,7 +32,7 @@ class Skybox {
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.indices, gl.STATIC_DRAW);
 
         // Create the shader program
-        this.program = create_compile_and_link_program(gl, 
+        this.program = create_compile_and_link_program(gl,
             // Vertex shader
             `#version 300 es
             precision highp float;
@@ -65,11 +65,9 @@ class Skybox {
             }`
         );
 
-        // Create and setup the cubemap texture
         this.texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.texture);
 
-        // Load a placeholder color while we wait for the image
         const placeholder = new Uint8Array([128, 128, 128, 255]);
         for (let i = 0; i < 6; i++) {
             gl.texImage2D(
@@ -79,28 +77,23 @@ class Skybox {
             );
         }
 
-        // Load the actual skybox image
         const image = new Image();
         image.onload = () => {
             gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.texture);
-            
-            // Create a canvas to process the image
+
+
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            
-            // Calculate face dimensions (assuming 4096x3072 image)
+
+
             const faceWidth = Math.floor(image.width / 4);   // 1024 for 4096 width
             const faceHeight = Math.floor(image.height / 3); // 1024 for 3072 height
-            
+
             canvas.width = faceWidth;
             canvas.height = faceHeight;
 
-            // Disable image smoothing to maintain sharpness
             ctx.imageSmoothingEnabled = false;
 
-            // Define the faces and their positions in the image
-            // Middle row (row 2): LFRB
-            // Column 2: Top (row 1), Bottom (row 3)
             const faces = [
                 // Right face (POSITIVE_X) - third in middle row
                 { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, x: faceWidth * 2, y: faceHeight },
@@ -118,15 +111,15 @@ class Skybox {
 
             faces.forEach(face => {
                 ctx.clearRect(0, 0, faceWidth, faceHeight);
-                
+
                 // Draw the face at exact dimensions without scaling
-                ctx.drawImage(image, 
-                    face.x, face.y, faceWidth, faceHeight,  // Source rectangle
-                    0, 0, faceWidth, faceHeight             // Destination rectangle (same size)
+                ctx.drawImage(image,
+                    face.x, face.y, faceWidth, faceHeight,
+                    0, 0, faceWidth, faceHeight
                 );
-                
+
                 const faceData = ctx.getImageData(0, 0, faceWidth, faceHeight);
-                
+
                 // Upload texture with no scaling
                 gl.texImage2D(
                     face.target,
@@ -136,14 +129,12 @@ class Skybox {
                 );
             });
 
-            // Set texture parameters for maximum quality
             gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 
-            // Try to enable anisotropic filtering
             const ext = gl.getExtension('EXT_texture_filter_anisotropic');
             if (ext) {
                 const max = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
@@ -158,17 +149,17 @@ class Skybox {
         gl.useProgram(this.program);
         set_uniform_matrix4(gl, this.program, 'projection', projectionMatrix);
         set_uniform_matrix4(gl, this.program, 'view', viewMatrix);
-        
+
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         const positionLoc = gl.getAttribLocation(this.program, 'position');
         gl.enableVertexAttribArray(positionLoc);
         gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 0, 0);
-        
+
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.texture);
         const skyboxLoc = gl.getUniformLocation(this.program, 'skybox');
         gl.uniform1i(skyboxLoc, 0);
-        
+
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
 

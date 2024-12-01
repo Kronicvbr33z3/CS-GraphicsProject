@@ -12,42 +12,42 @@ class Keys {
     static start_listening() {
         let keys = new Keys();
 
-        addEventListener( 'keydown', function( ev ) {
+        addEventListener('keydown', function (ev) {
             // Prevent default behavior for arrow keys and space
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(ev.code)) {
                 ev.preventDefault();
             }
-            
-            if( typeof ev.code === 'string' ) {
-                keys.keys_down[ ev.code ] = true;
-            }
-        } );
 
-        addEventListener( 'keyup', function( ev ) {
+            if (typeof ev.code === 'string') {
+                keys.keys_down[ev.code] = true;
+            }
+        });
+
+        addEventListener('keyup', function (ev) {
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(ev.code)) {
                 ev.preventDefault();
             }
-            
-            if( typeof ev.code === 'string' ) {
-                keys.keys_down[ ev.code ] = false;
+
+            if (typeof ev.code === 'string') {
+                keys.keys_down[ev.code] = false;
             }
-        } );
+        });
 
         return keys;
     }
 
-    is_key_down( code ) {
-        return !!this.keys_down[ code ];
+    is_key_down(code) {
+        return !!this.keys_down[code];
     }
 
-    is_key_up( code ) {
-        return !this.keys_down[ code ];
+    is_key_up(code) {
+        return !this.keys_down[code];
     }
 
     keys_down_list() {
         return Object.entries(this.keys_down)
-            .filter( kv => kv[1] /* the value */ )
-            .map( kv => kv[0] /* the key */ );
+            .filter(kv => kv[1] /* the value */)
+            .map(kv => kv[0] /* the key */);
 
         // the code above is equivalent to this:
         /*
