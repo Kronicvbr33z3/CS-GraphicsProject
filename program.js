@@ -274,6 +274,38 @@ let scene_root = new Node();
 let carNode = null;
 let carPosition = { x: 0, y: -1.8, z: 0 };
 
+// Initialize statue columns
+const STATUE_SPACING = 20;
+const STATUE_ROAD_OFFSET = 6;
+let statueColumns = [];
+let statueColumnsRoot = new Node();
+scene_root.addChild(statueColumnsRoot);
+
+// Function to create and position statue columns
+function createStatueColumns(zPosition) {
+    // Create left column
+    let leftColumn = new StatueColumn(gl, lit_program);
+    leftColumn.setPosition(-STATUE_ROAD_OFFSET, 0, zPosition);
+    
+    // Create right column
+    let rightColumn = new StatueColumn(gl, lit_program);
+    rightColumn.setPosition(STATUE_ROAD_OFFSET, 0, zPosition);
+    
+    statueColumns.push({ 
+        z: zPosition, 
+        columns: [leftColumn, rightColumn],
+        nodes: [leftColumn.root, rightColumn.root]
+    });
+    
+    statueColumnsRoot.addChild(leftColumn.root);
+    statueColumnsRoot.addChild(rightColumn.root);
+}
+
+// Initial statue columns setup
+for (let i = 0; i < 5; i++) {
+    createStatueColumns(i * STATUE_SPACING);
+}
+
 const NUM_SHOOTING_STARS = 5;
 let shootingStars = [];
 let shootingStarsRoot = new Node();
@@ -384,7 +416,13 @@ function render(now) {
         leftHeadlight.bind(gl, current_program, modelview);
         rightHeadlight.bind(gl, current_program, modelview);
 
-        job.mesh.render(gl);
+        // Check if job.mesh is an object with mesh and material properties
+        if (job.mesh.mesh && job.mesh.material) {
+            job.mesh.material.bind(gl, current_program, 0);
+            job.mesh.mesh.render(gl);
+        } else {
+            job.mesh.render(gl);
+        }
     }
 
     // Then render shooting stars with additive blending
@@ -432,9 +470,34 @@ function update() {
     let keys_down = keys.keys_down_list();
 
     if (carNode) {
-
         carPosition.z += CAR_SPEED_PER_FRAME;
         carNode.position = carPosition;
+
+        // Update statue columns
+        const visibleDistance = 40;
+        const currentSegment = Math.floor(carPosition.z / STATUE_SPACING);
+        
+        // Remove far behind columns
+        statueColumns = statueColumns.filter(pair => {
+            if (pair.z < carPosition.z - visibleDistance) {
+                pair.nodes.forEach(node => statueColumnsRoot.removeChild(node));
+                return false;
+            }
+            return true;
+        });
+        
+        // Add new columns ahead
+        const farthestZ = Math.max(...statueColumns.map(pair => pair.z), carPosition.z);
+        if (farthestZ < carPosition.z + visibleDistance) {
+            createStatueColumns(farthestZ + STATUE_SPACING);
+        }
+        
+        // Update statue rotations
+        statueColumns.forEach(pair => {
+            pair.columns.forEach(column => {
+                column.update(1.0 / DESIRED_TICK_RATE);
+            });
+        });
 
         leftHeadlight.x = carPosition.x - 0.4;
         leftHeadlight.y = carPosition.y - 1.2;

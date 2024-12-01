@@ -11,6 +11,8 @@ class TerrainGenerator {
         this.segments = [];
         this.segmentLength = this.size;
         this.heightmapCache = new Map();
+        this.segmentCache = new Map();
+        this.MAX_CACHED_SEGMENTS = 12;
     }
 
     generateHeightmap(offsetZ = 0) {
@@ -71,7 +73,21 @@ class TerrainGenerator {
         return heightmap;
     }
 
+    getCachedSegment(segmentIndex) {
+        const key = segmentIndex.toString();
+        const cached = this.segmentCache.get(key);
+        if (cached) {
+            this.segmentCache.delete(key);
+            this.segmentCache.set(key, cached);
+            return cached;
+        }
+        return null;
+    }
+
     createTerrainSegment(offsetZ) {
+        const cached = this.getCachedSegment(offsetZ);
+        if (cached) return cached;
+
         const heightmap = this.generateHeightmap(offsetZ);
         const centerLine = Math.floor(this.resolution / 2);
         const roadHalfWidth = this.roadWidth / 2;
@@ -98,6 +114,13 @@ class TerrainGenerator {
             z: offsetZ * this.size
         };
         terrain_node.scale = { x: 1, y: 1, z: 1 };
+
+        if (this.segmentCache.size >= this.MAX_CACHED_SEGMENTS) {
+            const oldestKey = this.segmentCache.keys().next().value;
+            this.segmentCache.delete(oldestKey);
+        }
+        this.segmentCache.set(offsetZ.toString(), terrain_node);
+
         return terrain_node;
     }
 

@@ -497,4 +497,104 @@ class NormalMesh {
 
         return new NormalMesh(gl, program, vertices, indices, materialArray, false);
     }
+
+    /**
+     * Load a mesh from a simple OBJ file
+     * @param {WebGLRenderingContext} gl 
+     * @param {WebGLProgram} program
+     * @param {string} objData - The OBJ file contents
+     * @param {LitMaterial[]} materials - Array of materials to use
+     */
+    static async from_obj(gl, program, objData, materials) {
+        const positions = [];
+        const normals = [];
+        const texCoords = [];
+        const vertices = [];
+        const indices = [];
+        let vertexMap = new Map();
+        let vertexCount = 0;
+
+        const lines = objData.split('\n');
+        for (let line of lines) {
+            line = line.trim();
+            if (!line || line.startsWith('#')) continue;
+
+            const parts = line.split(/\s+/);
+            const command = parts[0];
+
+            switch (command) {
+                case 'v': // Position
+                    positions.push([
+                        parseFloat(parts[1]),
+                        parseFloat(parts[2]),
+                        parseFloat(parts[3])
+                    ]);
+                    break;
+
+                case 'vt': // Texture coordinate
+                    texCoords.push([
+                        parseFloat(parts[1]),
+                        1.0 - parseFloat(parts[2])
+                    ]);
+                    break;
+
+                case 'vn': // Normal
+                    normals.push([
+                        parseFloat(parts[1]),
+                        parseFloat(parts[2]),
+                        parseFloat(parts[3])
+                    ]);
+                    break;
+
+                case 'f': // Face
+                    // Convert polygon to triangles
+                    for (let i = 1; i < parts.length - 1; i++) {
+                        const v1 = parts[1].split('/');
+                        const v2 = parts[i].split('/');
+                        const v3 = parts[i + 1].split('/');
+
+                        // Process each vertex of the triangle
+                        [v1, v2, v3].forEach(vertex => {
+                            const vertexKey = vertex.join('/');
+                            
+                            if (!vertexMap.has(vertexKey)) {
+                                // Handle negative indices (relative to end of array)
+                                const pi = parseInt(vertex[0]);
+                                const ti = vertex[1] ? parseInt(vertex[1]) : undefined;
+                                const ni = vertex[2] ? parseInt(vertex[2]) : undefined;
+
+                                // Convert negative indices to positive
+                                const posIndex = pi > 0 ? pi - 1 : positions.length + pi;
+                                const texIndex = ti ? (ti > 0 ? ti - 1 : texCoords.length + ti) : 0;
+                                const normIndex = ni ? (ni > 0 ? ni - 1 : normals.length + ni) : 0;
+
+                                const pos = positions[posIndex];
+                                const tex = texCoords[texIndex] || [0, 0];
+                                const norm = normals[normIndex] || [0, 1, 0];
+
+                                if (!pos) {
+                                    console.error('Invalid position index:', posIndex);
+                                    return;
+                                }
+
+                                vertices.push(
+                                    pos[0], pos[1], pos[2],           // position
+                                    1.0, 1.0, 1.0, 1.0,              // color (white)
+                                    tex[0], tex[1],                   // uv
+                                    norm[0], norm[1], norm[2],        // normal
+                                    0                                 // material index
+                                );
+
+                                vertexMap.set(vertexKey, vertexCount);
+                                vertexCount++;
+                            }
+                            indices.push(vertexMap.get(vertexKey));
+                        });
+                    }
+                    break;
+            }
+        }
+
+        return new NormalMesh(gl, program, vertices, indices, materials, false);
+    }
 }

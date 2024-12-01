@@ -34,9 +34,7 @@ class Node {
 
 
 function generateRenderJobs(parentMatrix, node, jobs = []) {
-
     const currentMatrix = parentMatrix.mul(node.getMatrix());
-
 
     if (node.data) {
         jobs.push({ matrix: currentMatrix, mesh: node.data });
