@@ -1,5 +1,4 @@
-
- /** 
+/** 
   * Creates a new vertex buffer and loads it full of the given data.
   * Preserves bound buffer.
   * 
@@ -130,8 +129,8 @@ function set_vertex_attrib_to_buffer(
  * @param {WebGLRenderingContext} gl 
  */
 function set_render_params( gl ) {
-    // gl.clearColor( 0.0, 0.0, 0.0, 1 );
-    gl.clearColor( 0.5, 0.8, 1.0, 1.0 );
+    // Change from light blue (0.5, 0.8, 1.0) to a vaporwave purple/pink sunset color
+    gl.clearColor( 0.45, 0.0, 0.45, 1.0 );  // Deep purple base color
 
     gl.enable( gl.DEPTH_TEST );
     gl.enable( gl.BLEND );

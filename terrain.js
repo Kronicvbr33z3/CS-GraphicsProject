@@ -73,6 +73,9 @@ class TerrainGenerator {
 
     createTerrainSegment(offsetZ) {
         const heightmap = this.generateHeightmap(offsetZ);
+        const centerLine = Math.floor(this.resolution / 2);
+        const roadHalfWidth = this.roadWidth / 2;
+
         const terrain_node = new Node(NormalMesh.from_heightmap(
             this.gl, 
             this.program, 
@@ -80,7 +83,13 @@ class TerrainGenerator {
             -this.size/2, 
             this.size/2, 
             this.materials, 
-            heightmap.map(row => row.map(h => h < 2 ? 0 : h < 6 ? 1 : 2))
+            heightmap.map((row, z) => row.map((h, x) => {
+                const distanceFromCenter = Math.abs(x - centerLine);
+                if (distanceFromCenter < roadHalfWidth) {
+                    return 0; // Road material (metal)
+                }
+                return h < 2 ? 0 : h < 6 ? 1 : 2;
+            }))
         ));
         
         terrain_node.position = { 

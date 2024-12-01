@@ -21,9 +21,15 @@ let canvas = document.getElementById( 'the-canvas' );
                 uniform vec3 light2_loc;
                 uniform vec3 light2_color;
 
-                const float light_attenuation_k = 0.005;
-                const float light_attenuation_l = 0.05;
-                const float light_attenuation_q = 0.00; /* no quadratic term for now */
+                uniform vec3 light3_loc;
+                uniform vec3 light3_color;
+
+                uniform vec3 light4_loc;
+                uniform vec3 light4_color;
+
+                const float light_attenuation_k = 1.0;
+                const float light_attenuation_l = 0.3;
+                const float light_attenuation_q = 0.2;
 
                 uniform float mat_0_ambient, mat_1_ambient, mat_2_ambient;
                 uniform float mat_0_diffuse, mat_1_diffuse, mat_2_diffuse;
@@ -138,13 +144,39 @@ let canvas = document.getElementById( 'the-canvas' );
                     vec4 color_from_light2 = vec4(
                             ( light2_diffuse_color + light2_spec_color ) * light2_atten, 1.0 );
 
+                    // Add headlight (light3) calculations
+                    vec3 vector_to_light3 = light3_loc - coords_tx;
+                    vec3 light3_dir = normalize( vector_to_light3 );
+                    float light3_atten = attenuation( vector_to_light3 );
+                
+                    vec3 light3_diffuse_color = diff_color( 
+                        normal_tx, light3_dir, light3_color, mat_diffuse);
+                    vec3 light3_spec_color = spec_color( 
+                        normal_tx, light3_dir, eye_dir, light3_color, mat_specular, mat_shininess );
+                    vec4 color_from_light3 = vec4(
+                            ( light3_diffuse_color + light3_spec_color ) * light3_atten, 1.0 );
+
+                    // Add headlight (light4) calculations
+                    vec3 vector_to_light4 = light4_loc - coords_tx;
+                    vec3 light4_dir = normalize( vector_to_light4 );
+                    float light4_atten = attenuation( vector_to_light4 );
+                
+                    vec3 light4_diffuse_color = diff_color( 
+                        normal_tx, light4_dir, light4_color, mat_diffuse);
+                    vec3 light4_spec_color = spec_color( 
+                        normal_tx, light4_dir, eye_dir, light4_color, mat_specular, mat_shininess );
+                    vec4 color_from_light4 = vec4(
+                            ( light4_diffuse_color + light4_spec_color ) * light4_atten, 1.0 );
+
                     v_color = 
                         (0.0 * color) + 
                         (1.4 * (
                             ambient_color +
                             color_from_sun +
                             color_from_light1 +
-                            color_from_light2
+                            color_from_light2 +
+                            color_from_light3 +
+                            color_from_light4
                         ));
                     v_uv = uv;
                     v_material_index = material_index;
@@ -201,6 +233,9 @@ let canvas = document.getElementById( 'the-canvas' );
             const FLY_SPEED = 10;    // units per second
             const FLY_SPEED_PER_FRAME = FLY_SPEED / DESIRED_TICK_RATE;
 
+            const CAR_SPEED = 5.0;  // units per second
+            const CAR_SPEED_PER_FRAME = CAR_SPEED / DESIRED_TICK_RATE;
+
             let keys = Keys.start_listening();
             let cam = new Camera();
             cam.translate( 0, 0, -7.5 );
@@ -216,8 +251,13 @@ let canvas = document.getElementById( 'the-canvas' );
             let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.4, 0.6, 0);
             let light1 = new Light(0, 4, 4, 0.6, 0.2, 0.8, 1);
             let carSpotlight = new Light(0, 4, 4, 0.8, 0.2, 1.0, 2);
+            let leftHeadlight = new Light(-0.4, -1.2, -15, 0.8, 0.7, 0.2, 3);   // Raised height from -1.7 to -1.2
+            let rightHeadlight = new Light(0.4, -1.2, -15, 0.8, 0.7, 0.2, 4);   // Raised height from -1.7 to -1.2
 
             let scene_root = new Node();
+
+            let carNode = null;  // Reference to the car node
+            let carPosition = { x: 0, y: -1.8, z: 0 };  // Initial car position
 
             async function loadCarModel() {
                 try {
@@ -227,7 +267,6 @@ let canvas = document.getElementById( 'the-canvas' );
                     const objResponse = await fetch('model/CarritoVaporwave.obj');
                     const objData = await objResponse.text();
                     
-                    // Instead of creating a material with texture, just pass the properties
                     const defaultMaterialProps = {
                         ambient: 0.3,
                         diffuse: 0.1,
@@ -244,8 +283,8 @@ let canvas = document.getElementById( 'the-canvas' );
                         defaultMaterialProps
                     );
                     
-                    const carNode = new Node(carMesh);
-                    carNode.position = { x: 0, y: -1.8, z: 0 }; 
+                    carNode = new Node(carMesh);
+                    carNode.position = carPosition;
                     carNode.scale = { x: 0.3, y: 0.3, z: 0.3 };
                     carNode.rotation.yaw = Math.PI / 3.15;
                     
@@ -299,24 +338,16 @@ let canvas = document.getElementById( 'the-canvas' );
                     sun.bind( gl, current_program, modelview );
                     light1.bind( gl, current_program, modelview );
                     carSpotlight.bind( gl, current_program, modelview );
+                    leftHeadlight.bind( gl, current_program, modelview );
+                    rightHeadlight.bind( gl, current_program, modelview );
 
                     job.mesh.render( gl );
                 }
             }
 
             const KEYMAP = {
-                'KeyW': function() { cam.move_in_direction( 0, 0, FLY_SPEED_PER_FRAME ); },
-                'KeyS': function() { cam.move_in_direction( 0, 0, -FLY_SPEED_PER_FRAME ); },
-                'KeyA': function() { cam.move_in_direction( -FLY_SPEED_PER_FRAME, 0, 0 ); },
-                'KeyD': function() { cam.move_in_direction( FLY_SPEED_PER_FRAME, 0, 0 ); },
-                'Space': function() { cam.translate( 0, FLY_SPEED_PER_FRAME, 0 ); },
-                'KeyC': function() { cam.translate( 0, -FLY_SPEED_PER_FRAME, 0 ); },
                 'KeyQ': function() { cam.add_roll( -ROTATION_SPEED_PER_FRAME ); },
                 'KeyE': function() { cam.add_roll( ROTATION_SPEED_PER_FRAME ); },
-                'ArrowLeft': function() { cam.add_yaw( -ROTATION_SPEED_PER_FRAME ); },
-                'ArrowRight': function() { cam.add_yaw( ROTATION_SPEED_PER_FRAME ); },
-                'ArrowUp': function() { cam.add_pitch( -ROTATION_SPEED_PER_FRAME ); },
-                'ArrowDown': function() { cam.add_pitch( ROTATION_SPEED_PER_FRAME ); },
                 'KeyT': function() { 
                     let camPos = new Vec4(cam.x, cam.y, cam.z, 1);
                     terrainGen.updateTerrain(camPos);
@@ -326,12 +357,35 @@ let canvas = document.getElementById( 'the-canvas' );
             function update() {
                 let keys_down = keys.keys_down_list();
 
-                for( const key of keys_down ) {
-                   let bound_function = KEYMAP[ key ];
+                // Update car position - move forward in the direction it's facing
+                if (carNode) {
+                    // Move car forward
+                    carPosition.z += CAR_SPEED_PER_FRAME;
+                    carNode.position = carPosition;
+                    
+                    // Update headlight positions relative to car position
+                    leftHeadlight.x = carPosition.x - 0.4;
+                    leftHeadlight.y = carPosition.y - 1.2;     // Raised from -1.4 to -1.2
+                    leftHeadlight.z = carPosition.z + 6.0;     // Increased forward distance from 4.0 to 6.0
 
-                   if( bound_function ) {
-                       bound_function();
-                   }
+                    rightHeadlight.x = carPosition.x + 0.4;
+                    rightHeadlight.y = carPosition.y - 1.2;    // Raised from -1.4 to -1.2
+                    rightHeadlight.z = carPosition.z + 6.0;    // Increased forward distance from 4.0 to 6.0
+                    
+                    // Update camera position to follow car
+                    cam.warp(
+                        carPosition.x,      // Same X as car
+                        carPosition.y + 2,  // Slightly above car
+                        carPosition.z - 7.5 // Behind car
+                    );
+                }
+
+                // Process other key inputs
+                for (const key of keys_down) {
+                    let bound_function = KEYMAP[key];
+                    if (bound_function) {
+                        bound_function();
+                    }
                 }
 
                 let camPos = {x: cam.x, y: cam.y, z: cam.z};
