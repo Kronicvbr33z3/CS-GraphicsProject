@@ -275,8 +275,10 @@ let carNode = null;
 let carPosition = { x: 0, y: -1.8, z: 0 };
 
 // Initialize statue columns
-const STATUE_SPACING = 20;
-const STATUE_ROAD_OFFSET = 6;
+const STATUE_SPACING = 18;
+const STATUE_ROAD_OFFSET = 3.5;
+const VISIBLE_STATUE_DISTANCE = 30;
+const STATUE_START_OFFSET = -190;
 let statueColumns = [];
 let statueColumnsRoot = new Node();
 scene_root.addChild(statueColumnsRoot);
@@ -302,11 +304,11 @@ function createStatueColumns(zPosition) {
 }
 
 // Initial statue columns setup
-for (let i = 0; i < 5; i++) {
-    createStatueColumns(i * STATUE_SPACING);
+for (let i = 0; i < 10; i++) {
+    createStatueColumns(STATUE_START_OFFSET + (i * STATUE_SPACING));
 }
 
-const NUM_SHOOTING_STARS = 5;
+const NUM_SHOOTING_STARS = 3;
 let shootingStars = [];
 let shootingStarsRoot = new Node();
 scene_root.addChild(shootingStarsRoot);
@@ -466,7 +468,19 @@ const KEYMAP = {
     },
 };
 
+const STAR_UPDATE_INTERVAL = 32;
+let lastStarUpdate = 0;
 function update() {
+    const now = performance.now();
+    
+    // Only update stars periodically
+    if (now - lastStarUpdate > STAR_UPDATE_INTERVAL) {
+        shootingStars.forEach(star => {
+            star.update(STAR_UPDATE_INTERVAL / 1000, carPosition);
+        });
+        lastStarUpdate = now;
+    }
+    
     let keys_down = keys.keys_down_list();
 
     if (carNode) {
@@ -474,7 +488,7 @@ function update() {
         carNode.position = carPosition;
 
         // Update statue columns
-        const visibleDistance = 40;
+        const visibleDistance = VISIBLE_STATUE_DISTANCE;
         const currentSegment = Math.floor(carPosition.z / STATUE_SPACING);
         
         // Remove far behind columns
@@ -510,7 +524,7 @@ function update() {
         cam.warp(
             carPosition.x,
             carPosition.y + 3.5,
-            carPosition.z - 6.5
+            carPosition.z - 8.5
         );
 
 
@@ -540,6 +554,5 @@ function update() {
 
     return;
 }
-
 requestAnimationFrame(render);
 setInterval(update, DESIRED_MSPT);

@@ -3,7 +3,7 @@ class TerrainGenerator {
         this.gl = gl;
         this.program = program;
         this.size = size;
-        this.resolution = resolution;
+        this.resolution = Math.min(resolution, 64);
         this.materials = materials;
         this.noise = noise;
         this.noise.seed(12345);
@@ -13,6 +13,13 @@ class TerrainGenerator {
         this.heightmapCache = new Map();
         this.segmentCache = new Map();
         this.MAX_CACHED_SEGMENTS = 12;
+        this.meshCache = new Map();
+        this.MAX_CACHED_MESHES = 20;
+        this.LOD_LEVELS = [
+            { distance: 20, resolution: this.resolution },
+            { distance: 40, resolution: this.resolution / 2 },
+            { distance: 80, resolution: this.resolution / 4 }
+        ];
     }
 
     generateHeightmap(offsetZ = 0) {
@@ -125,17 +132,18 @@ class TerrainGenerator {
     }
 
     updateTerrain(camPos) {
-        const camSegment = Math.floor(camPos.z / this.size);
+        const segmentsNeeded = new Set();
+        const visibleDistance = 80;
 
-        const segmentsNeeded = new Set([
-            camSegment - 3,
-            camSegment - 2,
-            camSegment - 1,
-            camSegment,
-            camSegment + 1,
-            camSegment + 2,
-            camSegment + 3
-        ]);
+        const camSegment = Math.floor(camPos.z / this.size);
+        for (let i = -3; i <= 4; i++) {
+            const segment = camSegment + i;
+            const distance = Math.abs(i * this.size);
+            
+            if (distance < visibleDistance) {
+                segmentsNeeded.add(segment);
+            }
+        }
 
         this.segments = this.segments.filter(segment => {
             if (!segmentsNeeded.has(segment.segment)) {
