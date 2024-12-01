@@ -100,7 +100,12 @@ let canvas = document.getElementById( 'the-canvas' );
                     gl_Position = projection * modelview * vec4( coordinates, 1.0 );
                     vec3 eye_dir = normalize( viewer_loc - coords_tx );
 
-                    vec4 ambient_color = vec4(mat_ambient * 2.0, mat_ambient * 2.0, mat_ambient * 2.0, 1.0);
+                    vec4 ambient_color = vec4(
+                        mat_ambient * 2.2, 
+                        mat_ambient * 1.8, 
+                        mat_ambient * 2.4, 
+                        1.0
+                    );
 
                     float cos_sun_dir_surf_normal = dot( sun_dir, normal_tx );
                     vec3 sun_diffuse_color = diff_color( normal_tx, sun_dir, sun_color, mat_diffuse );
@@ -135,7 +140,7 @@ let canvas = document.getElementById( 'the-canvas' );
 
                     v_color = 
                         (0.0 * color) + 
-                        (1.2 * (
+                        (1.4 * (
                             ambient_color +
                             color_from_sun +
                             color_from_light1 +
@@ -200,15 +205,15 @@ let canvas = document.getElementById( 'the-canvas' );
             let cam = new Camera();
             cam.translate( 0, 0, -4.5 );
 
-            let metal = new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.4, 1.0, 0.8, 20 );
-            let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.3, 0.9, 0.1, 1.0);
-            let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.3, 0.9, 0.1, 1.0);
-            let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.4, 1.0, 0.2, 1.0);
+            let metal = new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.5, 1.0, 0.9, 20 );
+            let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
+            let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.4, 0.9, 0.2, 1.0);
+            let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.5, 1.0, 0.3, 1.0);
 
-            let sun_dir = (new Vec4(0.5, 1.0, 0.3, 0.0)).norm();
-            let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.95, 0.9, 0);
-            let light1 = new Light(0, 4, 4, 0.8, 0.2, 0.8, 1);
-            let carSpotlight = new Light(0, 4, 4, 1.0, 0.9, 1.0, 2);
+            let sun_dir = (new Vec4(0.2, 0.3, 0.5, 0.0)).norm();
+            let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.4, 0.6, 0);
+            let light1 = new Light(0, 4, 4, 0.6, 0.2, 0.8, 1);
+            let carSpotlight = new Light(0, 4, 4, 0.8, 0.2, 1.0, 2);
 
             let scene_root = new Node();
 
