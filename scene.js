@@ -23,7 +23,7 @@ class Node {
 
     // Compute the model matrix for this node
     getMatrix() {
-        let matrix = new Mat4(); // Assume Mat4 is your 4x4 matrix class
+        let matrix = new Mat4(); 
         matrix = matrix.mul(Mat4.translation(this.position.x, this.position.y, this.position.z));
         matrix = matrix.mul(Mat4.rotation_xy(this.rotation.roll));  // roll is rotation around x
         matrix = matrix.mul(Mat4.rotation_xz(this.rotation.pitch)); // pitch is rotation around y

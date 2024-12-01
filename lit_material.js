@@ -70,13 +70,17 @@ class LitMaterial {
         image.src = image_url;
     }
 
-    bind( gl, program ) {
+    bind( gl, program, textureUnit = 0 ) {
         gl.bindTexture( gl.TEXTURE_2D, this.tex );
 
-        set_uniform_scalar( gl, program, 'mat_ambient', this.ambient );
-        set_uniform_scalar( gl, program, 'mat_diffuse', this.diffuse );
-        set_uniform_scalar( gl, program, 'mat_specular', this.specular );
-        set_uniform_scalar( gl, program, 'mat_shininess', this.shininess );
+        // Set the uniform for this specific material's texture unit
+        set_uniform_int( gl, program, `tex_${textureUnit}`, textureUnit );
+        
+        // Set material properties with unique names based on texture unit
+        set_uniform_scalar( gl, program, `mat_${textureUnit}_ambient`, this.ambient );
+        set_uniform_scalar( gl, program, `mat_${textureUnit}_diffuse`, this.diffuse );
+        set_uniform_scalar( gl, program, `mat_${textureUnit}_specular`, this.specular );
+        set_uniform_scalar( gl, program, `mat_${textureUnit}_shininess`, this.shininess );
     }
 
     /**

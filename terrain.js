@@ -5,65 +5,124 @@ class TerrainGenerator {
         this.size = size;
         this.resolution = resolution;
         this.materials = materials;
-        this.noise = noise; // from perlin.js
-        this.noise.seed(Math.random());
+        this.noise = noise;
+        this.noise.seed(12345);
+        this.roadWidth = 8;
+        this.segments = [];
+        this.segmentLength = this.size;
+        this.heightmapCache = new Map();
     }
 
-    generateHeightmap() {
+    generateHeightmap(offsetZ = 0) {
+        const cacheKey = offsetZ.toString();
+        if (this.heightmapCache.has(cacheKey)) {
+            return this.heightmapCache.get(cacheKey);
+        }
+
         const heightmap = new Array(this.resolution);
-        const scale = 2.5;
-        const heightScale = 4.0;
+        const scale = 6.0;
+        const heightScale = 6.0;
+        const zScale = 2.5;
+
+        const roadHalfWidth = this.roadWidth / 2;
+        const centerLine = Math.floor(this.resolution / 2);
 
         for (let z = 0; z < this.resolution; z++) {
             heightmap[z] = new Array(this.resolution);
             for (let x = 0; x < this.resolution; x++) {
-                // Convert coordinates to noise space
-                let nx = x / this.resolution * scale;
-                let nz = z / this.resolution * scale;
+                const distanceFromCenter = Math.abs(x - centerLine);
                 
-                // Generate height using multiple octaves of noise
+                if (distanceFromCenter < roadHalfWidth) {
+                    heightmap[z][x] = 0;
+                    continue;
+                }
+
+                const worldX = (x - this.resolution/2) / this.resolution * this.size;
+                const worldZ = (z / this.resolution * this.size) + (offsetZ * this.size);
+                
+                let nx = worldX / (this.size/scale);
+                let nz = worldZ / (this.size/scale);
+                
                 let height = 0;
                 height += this.noise.perlin2(nx, nz);
                 height += this.noise.perlin2(nx * 2, nz * 2) * 0.5;
                 height += this.noise.perlin2(nx * 4, nz * 4) * 0.25;
+                height += this.noise.perlin2(nx * 8, nz * 8) * 0.125;
+                
+                height = Math.abs(height) * 1.5;
+                
+                const transitionZone = 5;
+                if (distanceFromCenter < roadHalfWidth + transitionZone) {
+                    const transitionFactor = (distanceFromCenter - roadHalfWidth) / transitionZone;
+                    height *= transitionFactor;
+                }
                 
                 heightmap[z][x] = height * heightScale;
             }
         }
+
+        this.heightmapCache.set(cacheKey, heightmap);
+        
+        if (this.heightmapCache.size > 20) {
+            const oldestKey = this.heightmapCache.keys().next().value;
+            this.heightmapCache.delete(oldestKey);
+        }
+
         return heightmap;
     }
 
-    createTerrainNode() {
-        // Generate heightmap
-        const heightmap = this.generateHeightmap();
+    createTerrainSegment(offsetZ) {
+        const heightmap = this.generateHeightmap(offsetZ);
+        const terrain_node = new Node(NormalMesh.from_heightmap(
+            this.gl, 
+            this.program, 
+            heightmap, 
+            -this.size/2, 
+            this.size/2, 
+            this.materials, 
+            heightmap.map(row => row.map(h => h < 2 ? 0 : h < 6 ? 1 : 2))
+        ));
         
-        // Find min and max heights for normalization
-        let minHeight = Infinity;
-        let maxHeight = -Infinity;
-        for (let row of heightmap) {
-            for (let height of row) {
-                minHeight = Math.min(minHeight, height);
-                maxHeight = Math.max(maxHeight, height);
-            }
-        }
-
-        // Create mesh using the heightmap
-        const terrainMesh = NormalMesh.from_heightmap(
-            this.gl,
-            this.program,
-            heightmap,
-            minHeight,
-            maxHeight,
-            this.materials[0] // Use first material as default
-        );
-
-        // Create and return terrain node
-        const terrainNode = new Node(terrainMesh);
-        return terrainNode;
+        terrain_node.position = { 
+            x: 0, 
+            y: -2, 
+            z: offsetZ * this.size
+        };
+        terrain_node.scale = { x: 1, y: 1, z: 1 };
+        return terrain_node;
     }
 
     updateTerrain(camPos) {
-        // Optional: Implement terrain updating based on camera position
-        // This could be used for continuous terrain generation or LOD
+        const camSegment = Math.floor(camPos.z / this.size);
+        
+        const segmentsNeeded = new Set([
+            camSegment - 3,
+            camSegment - 2,
+            camSegment - 1,
+            camSegment,
+            camSegment + 1,
+            camSegment + 2,
+            camSegment + 3
+        ]);
+
+        this.segments = this.segments.filter(segment => {
+            if (!segmentsNeeded.has(segment.segment)) {
+                segment.node.parent?.removeChild(segment.node);
+                return false;
+            }
+            return true;
+        });
+
+        segmentsNeeded.forEach(segmentIndex => {
+            if (!this.segments.some(s => s.segment === segmentIndex)) {
+                const node = this.createTerrainSegment(segmentIndex);
+                this.segments.push({
+                    segment: segmentIndex,
+                    node: node
+                });
+            }
+        });
+
+        return this.segments.map(s => s.node);
     }
 }

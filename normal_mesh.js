@@ -1,5 +1,4 @@
-
-const VERTEX_STRIDE = 48;
+const VERTEX_STRIDE = 52;
 
 
 class NormalMesh {
@@ -11,15 +10,14 @@ class NormalMesh {
      * @param {number[]} vertices
      * @param {number[]} indices
     */
-    constructor( gl, program, vertices, indices, material, use_color ) {
+    constructor( gl, program, vertices, indices, materials, use_color ) {
         this.verts = create_and_load_vertex_buffer( gl, vertices, gl.STATIC_DRAW );
         this.indis = create_and_load_elements_buffer( gl, indices, gl.STATIC_DRAW );
 
         this.n_verts = vertices.length / VERTEX_STRIDE * 4;
         this.n_indis = indices.length;
         this.program = program;
-        this.material = material;
-
+        this.materials = Array.isArray(materials) ? materials : [materials];
         this.use_color = use_color ?? false;
     }
 
@@ -51,6 +49,13 @@ class NormalMesh {
             this.verts, 3, 
             gl.FLOAT, false, VERTEX_STRIDE, 36
         )
+
+        set_vertex_attrib_to_buffer(
+            gl, this.program,
+            "material_index",
+            this.verts, 1,
+            gl.FLOAT, false, VERTEX_STRIDE, 48
+        );
     }
     
 
@@ -64,54 +69,63 @@ class NormalMesh {
         let hheight = height / 2.0;
         let hdepth = depth / 2.0;
 
-        let verts = [
-            hwidth, -hheight, -hdepth,  1.0, 0.0, 1.0, 1.0,     1.0, 1.0,   0.0, 0.0, -1.0,
-            -hwidth, -hheight, -hdepth, 0.0, 1.0, 1.0, 1.0,     0.0, 1.0,   0.0, 0.0, -1.0,
-            -hwidth, hheight, -hdepth,  0.5, 0.5, 1.0, 1.0,     0.0, 0.0,   0.0, 0.0, -1.0,
-            hwidth, hheight, -hdepth,   1.0, 1.0, 0.5, 1.0,     1.0, 0.0,   0.0, 0.0, -1.0,
+        let verts = [];
+        
+        // Helper function to add vertex data with material index
+        function addVert(x, y, z, r, g, b, a, u, v, nx, ny, nz) {
+            verts.push(
+                x, y, z,           // position
+                r, g, b, a,        // color
+                u, v,              // uv
+                nx, ny, nz,        // normal
+                0                  // material index (always 0 for non-heightmap meshes)
+            );
+        }
 
-            hwidth, -hheight, hdepth,   1.0, 0.0, 1.0, 1.0,     1.0, 1.0,   1.0, 0.0, 0.0,
-            hwidth, -hheight, -hdepth,  0.0, 1.0, 1.0, 1.0,     0.0, 1.0,   1.0, 0.0, 0.0,
-            hwidth, hheight, -hdepth,   0.5, 0.5, 1.0, 1.0,     0.0, 0.0,   1.0, 0.0, 0.0,
-            hwidth, hheight, hdepth,    1.0, 1.0, 0.5, 1.0,     1.0, 0.0,   1.0, 0.0, 0.0,
+        // Front face
+        addVert(hwidth, -hheight, -hdepth,  1.0, 0.0, 1.0, 1.0,  1.0, 1.0,  0.0, 0.0, -1.0);
+        addVert(-hwidth, -hheight, -hdepth, 0.0, 1.0, 1.0, 1.0,  0.0, 1.0,  0.0, 0.0, -1.0);
+        addVert(-hwidth, hheight, -hdepth,  0.5, 0.5, 1.0, 1.0,  0.0, 0.0,  0.0, 0.0, -1.0);
+        addVert(hwidth, hheight, -hdepth,   1.0, 1.0, 0.5, 1.0,  1.0, 0.0,  0.0, 0.0, -1.0);
 
-            -hwidth, -hheight, hdepth,  1.0, 0.0, 1.0, 1.0,     1.0, 1.0,   0.0, 0.0, 1.0,
-            hwidth, -hheight, hdepth,   1.0, 1.0, 0.5, 1.0,     0.0, 1.0,   0.0, 0.0, 1.0,
-            hwidth, hheight, hdepth,    0.5, 0.5, 1.0, 1.0,     0.0, 0.0,   0.0, 0.0, 1.0,
-            -hwidth, hheight, hdepth,   0.0, 1.0, 1.0, 1.0,     1.0, 0.0,   0.0, 0.0, 1.0,
-            
-            -hwidth, -hheight, hdepth,  1.0, 0.0, 1.0, 1.0,     0.0, 1.0,   -1.0, 0.0, 0.0,
-            -hwidth, -hheight, -hdepth, 0.0, 1.0, 1.0, 1.0,     1.0, 1.0,   -1.0, 0.0, 0.0,
-            -hwidth, hheight, -hdepth,  0.5, 0.5, 1.0, 1.0,     1.0, 0.0,   -1.0, 0.0, 0.0,
-            -hwidth, hheight, hdepth,   1.0, 1.0, 0.5, 1.0,     0.0, 0.0,   -1.0, 0.0, 0.0,
+        // Right face
+        addVert(hwidth, -hheight, hdepth,   1.0, 0.0, 1.0, 1.0,  1.0, 1.0,  1.0, 0.0, 0.0);
+        addVert(hwidth, -hheight, -hdepth,  0.0, 1.0, 1.0, 1.0,  0.0, 1.0,  1.0, 0.0, 0.0);
+        addVert(hwidth, hheight, -hdepth,   0.5, 0.5, 1.0, 1.0,  0.0, 0.0,  1.0, 0.0, 0.0);
+        addVert(hwidth, hheight, hdepth,    1.0, 1.0, 0.5, 1.0,  1.0, 0.0,  1.0, 0.0, 0.0);
 
-            -hwidth, hheight, -hdepth,  1.0, 0.0, 0.0, 1.0,     0.0, 1.0,   0.0, 1.0, 0.0,
-            hwidth, hheight, -hdepth,   0.0, 1.0, 0.0, 1.0,     1.0, 1.0,   0.0, 1.0, 0.0,
-            hwidth, hheight, hdepth,    0.0, 0.0, 1.0, 1.0,     1.0, 0.0,   0.0, 1.0, 0.0,
-            -hwidth, hheight, hdepth,   1.0, 1.0, 0.0, 1.0,     0.0, 0.0,   0.0, 1.0, 0.0,
+        // Back face
+        addVert(-hwidth, -hheight, hdepth,  1.0, 0.0, 1.0, 1.0,  1.0, 1.0,  0.0, 0.0, 1.0);
+        addVert(hwidth, -hheight, hdepth,   1.0, 1.0, 0.5, 1.0,  0.0, 1.0,  0.0, 0.0, 1.0);
+        addVert(hwidth, hheight, hdepth,    0.5, 0.5, 1.0, 1.0,  0.0, 0.0,  0.0, 0.0, 1.0);
+        addVert(-hwidth, hheight, hdepth,   0.0, 1.0, 1.0, 1.0,  1.0, 0.0,  0.0, 0.0, 1.0);
 
-            -hwidth, -hheight, -hdepth, 1.0, 0.0, 0.0, 1.0,     0.0, 1.0,   0.0, -1.0, 0.0,
-            hwidth, -hheight, -hdepth,  0.0, 1.0, 0.0, 1.0,     1.0, 1.0,   0.0, -1.0, 0.0,
-            hwidth, -hheight, hdepth,   0.0, 0.0, 1.0, 1.0,     1.0, 0.0,   0.0, -1.0, 0.0,
-            -hwidth, -hheight, hdepth,  1.0, 1.0, 0.0, 1.0,     0.0, 0.0,   0.0, -1.0, 0.0,
-        ];
+        // Left face
+        addVert(-hwidth, -hheight, hdepth,  1.0, 0.0, 1.0, 1.0,  0.0, 1.0,  -1.0, 0.0, 0.0);
+        addVert(-hwidth, -hheight, -hdepth, 0.0, 1.0, 1.0, 1.0,  1.0, 1.0,  -1.0, 0.0, 0.0);
+        addVert(-hwidth, hheight, -hdepth,  0.5, 0.5, 1.0, 1.0,  1.0, 0.0,  -1.0, 0.0, 0.0);
+        addVert(-hwidth, hheight, hdepth,   1.0, 1.0, 0.5, 1.0,  0.0, 0.0,  -1.0, 0.0, 0.0);
+
+        // Top face
+        addVert(-hwidth, hheight, -hdepth,  1.0, 0.0, 0.0, 1.0,  0.0, 1.0,  0.0, 1.0, 0.0);
+        addVert(hwidth, hheight, -hdepth,   0.0, 1.0, 0.0, 1.0,  1.0, 1.0,  0.0, 1.0, 0.0);
+        addVert(hwidth, hheight, hdepth,    0.0, 0.0, 1.0, 1.0,  1.0, 0.0,  0.0, 1.0, 0.0);
+        addVert(-hwidth, hheight, hdepth,   1.0, 1.0, 0.0, 1.0,  0.0, 0.0,  0.0, 1.0, 0.0);
+
+        // Bottom face
+        addVert(-hwidth, -hheight, -hdepth, 1.0, 0.0, 0.0, 1.0,  0.0, 1.0,  0.0, -1.0, 0.0);
+        addVert(hwidth, -hheight, -hdepth,  0.0, 1.0, 0.0, 1.0,  1.0, 1.0,  0.0, -1.0, 0.0);
+        addVert(hwidth, -hheight, hdepth,   0.0, 0.0, 1.0, 1.0,  1.0, 0.0,  0.0, -1.0, 0.0);
+        addVert(-hwidth, -hheight, hdepth,  1.0, 1.0, 0.0, 1.0,  0.0, 0.0,  0.0, -1.0, 0.0);
 
         let indis = [
-            // clockwise winding
-            //0, 3, 2, 2, 1, 0,
-            //4, 7, 6, 6, 5, 4,
-            //8, 11, 10, 10, 9, 8,
-            //12, 13, 14, 14, 15, 12,
-            //16, 17, 18, 18, 19, 16,
-            //20, 23, 22, 22, 21, 20,
-            
             // counter-clockwise winding
-            2, 1, 0, 2, 0, 3,
-            6, 5, 4, 4, 7, 6,
-            10, 9, 8, 8, 11, 10,
-            12, 13, 14, 14, 15, 12,
-            16, 17, 18, 18, 19, 16,
-            22, 21, 20, 20, 23, 22,
+            2, 1, 0, 2, 0, 3,    // front
+            6, 5, 4, 4, 7, 6,    // right
+            10, 9, 8, 8, 11, 10, // back
+            12, 13, 14, 14, 15, 12, // left
+            16, 17, 18, 18, 19, 16, // top
+            22, 21, 20, 20, 23, 22  // bottom
         ];
 
         return new NormalMesh( gl, program, verts, indis, material, false );
@@ -125,14 +139,26 @@ class NormalMesh {
         let hwidth = width / 2;
         let hdepth = depth / 2;
         
-        let verts = [
-            -hwidth, 0, -hdepth,  1.0, 1.0, 1.0, 1.0,     uv_min, uv_max,   0.0, 1.0, 0.0,
-            hwidth, 0, -hdepth,   1.0, 1.0, 1.0, 1.0,     uv_max, uv_max,   0.0, 1.0, 0.0,
-            hwidth, 0, hdepth,    1.0, 1.0, 1.0, 1.0,     uv_max, uv_min,   0.0, 1.0, 0.0,
-            -hwidth, 0, hdepth,   1.0, 1.0, 1.0, 1.0,     uv_min, uv_min,   0.0, 1.0, 0.0,
-        ];
+        let verts = [];
+        
+        // Helper function to add vertex data with material index
+        function addVert(x, y, z, r, g, b, a, u, v, nx, ny, nz) {
+            verts.push(
+                x, y, z,           // position
+                r, g, b, a,        // color
+                u, v,              // uv
+                nx, ny, nz,        // normal
+                0                  // material index (always 0 for non-heightmap meshes)
+            );
+        }
 
-        let indis = [ 0, 1, 2, 2, 3, 0, ];
+        // Add the four corners of the platform
+        addVert(-hwidth, 0, -hdepth, 1.0, 1.0, 1.0, 1.0, uv_min, uv_max, 0.0, 1.0, 0.0);
+        addVert(hwidth, 0, -hdepth,  1.0, 1.0, 1.0, 1.0, uv_max, uv_max, 0.0, 1.0, 0.0);
+        addVert(hwidth, 0, hdepth,   1.0, 1.0, 1.0, 1.0, uv_max, uv_min, 0.0, 1.0, 0.0);
+        addVert(-hwidth, 0, hdepth,  1.0, 1.0, 1.0, 1.0, uv_min, uv_min, 0.0, 1.0, 0.0);
+
+        let indis = [ 0, 1, 2, 2, 3, 0 ];
 
         return new NormalMesh( gl, program, verts, indis, material, false );
     }
@@ -145,7 +171,7 @@ class NormalMesh {
      * @param {number} min 
      * @param {number} max
      */
-    static from_heightmap( gl, program, map, min, max, material ) {
+    static from_heightmap( gl, program, map, min, max, materials, materialIndices ) {
         let rows = map.length;
         let cols = map[0].length;
         const MIN_HEIGHT_COLOR = 0.2;
@@ -161,12 +187,13 @@ class NormalMesh {
             return MIN_HEIGHT_COLOR + normed_height * ( 1 - MIN_HEIGHT_COLOR );
         }
 
-        function push_vert( verts, vert, u, v, normal ) {
+        function push_vert( verts, vert, u, v, normal, materialIndex ) {
             verts.push( vert.x, vert.y, vert.z );
             let vert_bright = color( vert.y );
             verts.push( vert_bright, vert_bright, vert_bright, 1.0 );
             verts.push( u, v );
             verts.push( normal.x, normal.y, normal.z );
+            verts.push( materialIndex );
         }
 
         for( let row = 1; row < rows; row++ ) {
@@ -178,6 +205,11 @@ class NormalMesh {
                 let pos_bl = map[row][col - 1];
                 let pos_br = map[row][col];
 
+                let mat_tl = materialIndices[row - 1][col - 1];
+                let mat_tr = materialIndices[row - 1][col];
+                let mat_bl = materialIndices[row][col - 1];
+                let mat_br = materialIndices[row][col];
+
                 let v_tl = new Vec4( -1, pos_tl, -1 );
                 let v_tr = new Vec4( 0, pos_tr, -1 );
                 let v_bl = new Vec4( -1, pos_bl, 0 );
@@ -185,10 +217,6 @@ class NormalMesh {
 
                 let normal_t1 = Vec4.normal_of_triangle( v_tl, v_tr, v_bl );
                 let normal_t2 = Vec4.normal_of_triangle( v_br, v_bl, v_tr );
-
-                // debug
-                // normal_t1 = new Vec4( 0, 1, 0 );
-                // normal_t2 = new Vec4( 0, 1, 0 );
 
                 v_tl.x += col - off_x;
                 v_tl.z += row - off_z;
@@ -199,13 +227,13 @@ class NormalMesh {
                 v_br.x += col - off_x;
                 v_br.z += row - off_z;
 
-                push_vert( verts, v_tl, 0, 1, normal_t1 );
-                push_vert( verts, v_tr, 1, 1, normal_t1 );
-                push_vert( verts, v_bl, 0, 0, normal_t1 );
+                push_vert( verts, v_tl, 0, 1, normal_t1, mat_tl );
+                push_vert( verts, v_tr, 1, 1, normal_t1, mat_tr );
+                push_vert( verts, v_bl, 0, 0, normal_t1, mat_bl );
 
-                push_vert( verts, v_br, 1, 0, normal_t2 );
-                push_vert( verts, v_bl, 0, 0, normal_t2 );
-                push_vert( verts, v_tr, 1, 1, normal_t2 );
+                push_vert( verts, v_br, 1, 0, normal_t2, mat_br );
+                push_vert( verts, v_bl, 0, 0, normal_t2, mat_bl );
+                push_vert( verts, v_tr, 1, 1, normal_t2, mat_tr );
 
                 indis.push( 
                     indi_start,
@@ -218,7 +246,7 @@ class NormalMesh {
             }
         }
 
-        return new NormalMesh( gl, program, verts, indis, material, true );
+        return new NormalMesh( gl, program, verts, indis, materials, true );
     }
 
     /**
@@ -227,18 +255,18 @@ class NormalMesh {
      * @param {WebGLRenderingContext} gl 
      */
     render( gl ) {
-        // gl.enable( gl.CULL_FACE );
-        
         gl.useProgram( this.program );
         this.set_vertex_attributes();
         gl.bindBuffer( gl.ARRAY_BUFFER, this.verts );
         gl.bindBuffer( gl.ELEMENT_ARRAY_BUFFER, this.indis );
-        bind_texture_samplers( gl, this.program, "tex_0" );
 
-        gl.activeTexture( gl.TEXTURE0 );
-        this.material.bind( gl, this.program );
+        this.materials.forEach((material, index) => {
+            gl.activeTexture(gl.TEXTURE0 + index);
+            material.bind(gl, this.program, index);
+        });
 
         set_uniform_int( gl, this.program, 'use_color', this.use_color );
+        set_uniform_int( gl, this.program, 'num_materials', this.materials.length );
 
         gl.drawElements( gl.TRIANGLES, this.n_indis, gl.UNSIGNED_SHORT, 0 );
     }
@@ -257,39 +285,42 @@ class NormalMesh {
             throw new Error( "subdivs must be at least 3. value: " + subdivs );
         }
 
-        let verts = []
-        let indis = []
+        let verts = [];
+        let indis = [];
+
+        // Helper function to add vertex data with material index
+        function addVert(x, y, z, r, g, b, a, u, v, nx, ny, nz) {
+            verts.push(
+                x, y, z,           // position
+                r, g, b, a,        // color
+                u, v,              // uv
+                nx, ny, nz,        // normal
+                0                  // material index (always 0 for non-heightmap meshes)
+            );
+        }
 
         for( let layer = 0; layer <= subdivs; layer++ ) {
-            // let y = layer / subdivs - 0.5;
-            let y_turns = layer /  subdivs / 2;
+            let y_turns = layer / subdivs / 2;
             let y = Math.cos( 2 * Math.PI * y_turns ) / 2;
             let radius_scale_for_layer = Math.sin( 2 * Math.PI * y_turns );
 
             for( let subdiv = 0; subdiv <= subdivs; subdiv++ ) {
                 let turns = subdiv / subdivs; 
                 let rads = 2 * Math.PI * turns;
-    
+
                 let x = Math.cos( rads ) / 2 * radius_scale_for_layer;
                 let z = Math.sin( rads ) / 2 * radius_scale_for_layer;
 
                 let point_norm = new Vec4( x, y, z, 0.0 ).norm();
                 let scaled_point = point_norm.scaled( radius );
                 
-                // coordinates
-                verts.push( scaled_point.x, scaled_point.y, scaled_point.z );
-
-                // console.log( layer, subdiv, scaled_point.x, scaled_point.y, scaled_point.z );
-                
-                // color (we're making it white for simplicity)
-                verts.push( 1, 1, 1, 1 );
-
-                // uvs
-                verts.push( subdiv / subdivs, layer / subdivs );
-                
-                // normal vector. make sure you understand why the normalized coordinate is 
-                // equivalent to the normal vector for the sphere.
-                verts.push( point_norm.x, point_norm.y, point_norm.z );
+                // Add vertex using our helper function
+                addVert(
+                    scaled_point.x, scaled_point.y, scaled_point.z,  // position
+                    1, 1, 1, 1,                                      // color (white)
+                    subdiv / subdivs, layer / subdivs,               // uv
+                    point_norm.x, point_norm.y, point_norm.z         // normal
+                );
             }
         }
 

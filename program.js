@@ -22,18 +22,20 @@ let canvas = document.getElementById( 'the-canvas' );
                 const float light_attenuation_l = 0.1;
                 const float light_attenuation_q = 0.00; /* no quadratic term for now */
 
-                uniform float mat_ambient;
-                uniform float mat_diffuse;
-                uniform float mat_specular;
-                uniform float mat_shininess;
+                uniform float mat_0_ambient, mat_1_ambient, mat_2_ambient;
+                uniform float mat_0_diffuse, mat_1_diffuse, mat_2_diffuse;
+                uniform float mat_0_specular, mat_1_specular, mat_2_specular;
+                uniform float mat_0_shininess, mat_1_shininess, mat_2_shininess;
 
                 in vec3 coordinates;
                 in vec4 color;
                 in vec2 uv;
                 in vec3 surf_normal;
+                in float material_index;
 
                 out vec4 v_color;
                 out vec2 v_uv;
+                out float v_material_index;
 
                 vec3 diff_color( 
                     vec3 normal, 
@@ -50,7 +52,7 @@ let canvas = document.getElementById( 'the-canvas' );
                     vec3 eye_dir, 
                     vec3 light_color, 
                     float mat_specular,
-                    float mat_shiniess
+                    float mat_shininess
                 ) {
                     float cos_light_surf_normal = dot( normal, light_dir );
 
@@ -80,6 +82,15 @@ let canvas = document.getElementById( 'the-canvas' );
                 }
 
                 void main( void ) {
+                    float mat_ambient = material_index < 0.5 ? mat_0_ambient : 
+                                      material_index < 1.5 ? mat_1_ambient : mat_2_ambient;
+                    float mat_diffuse = material_index < 0.5 ? mat_0_diffuse :
+                                      material_index < 1.5 ? mat_1_diffuse : mat_2_diffuse;
+                    float mat_specular = material_index < 0.5 ? mat_0_specular :
+                                       material_index < 1.5 ? mat_1_specular : mat_2_specular;
+                    float mat_shininess = material_index < 0.5 ? mat_0_shininess :
+                                        material_index < 1.5 ? mat_1_shininess : mat_2_shininess;
+                            
                     vec3 normal_tx = normalize( mat3( model ) * surf_normal );
                     vec3 coords_tx = ( model * vec4( coordinates, 1.0 ) ).xyz;
 
@@ -88,7 +99,6 @@ let canvas = document.getElementById( 'the-canvas' );
 
                     vec4 ambient_color = vec4( mat_ambient, mat_ambient, mat_ambient, 1.0 );
 
-                    // vec3 sun_dir_tx = 
                     float cos_sun_dir_surf_normal = dot( sun_dir, normal_tx );
                     vec3 sun_diffuse_color = diff_color( normal_tx, sun_dir, sun_color, mat_diffuse );
                     
@@ -108,8 +118,6 @@ let canvas = document.getElementById( 'the-canvas' );
                     vec4 color_from_light1 = vec4(
                             ( light1_diffuse_color + light1_spec_color ) * light1_atten, 1.0 );
 
-                    /* multiply color by 0 to remove it. try changing the 0 to a small number like .2
-                    and the 1 to the complement of that number (1 - .2 = .8) to see how color blending works.*/
                     v_color = 
                         ( 0.0 * color ) + 
                         ( 1.0 * (
@@ -118,6 +126,7 @@ let canvas = document.getElementById( 'the-canvas' );
                             color_from_light1
                         ) );
                     v_uv = uv;
+                    v_material_index = material_index;
                 }
             `;
 
@@ -127,16 +136,25 @@ let canvas = document.getElementById( 'the-canvas' );
 
                 in vec4 v_color;
                 in vec2 v_uv;
+                in float v_material_index;
 
                 out vec4 f_color;
 
                 uniform sampler2D tex_0;
+                uniform sampler2D tex_1;
+                uniform sampler2D tex_2;
+                uniform int num_materials;
 
                 void main( void ) {
-                    f_color = v_color * texture( tex_0, v_uv ); 
-
-                    /* we can test depth values with this.
-                    f_color = vec4(vec3(gl_FragCoord.z), 1.0); */
+                    vec4 tex_color;
+                    if (v_material_index < 0.5) {
+                        tex_color = texture(tex_0, v_uv);
+                    } else if (v_material_index < 1.5) {
+                        tex_color = texture(tex_1, v_uv);
+                    } else {
+                        tex_color = texture(tex_2, v_uv);
+                    }
+                    f_color = v_color * tex_color;
                 }
             `;
 
@@ -159,21 +177,17 @@ let canvas = document.getElementById( 'the-canvas' );
             const ROTATION_SPEED = 0.2; // eighth turn per second
             const ROTATION_SPEED_PER_FRAME = ROTATION_SPEED / DESIRED_TICK_RATE;
 
-            const FLY_SPEED = 2;    // units per second
+            const FLY_SPEED = 10;    // units per second
             const FLY_SPEED_PER_FRAME = FLY_SPEED / DESIRED_TICK_RATE;
 
             let keys = Keys.start_listening();
             let cam = new Camera();
             cam.translate( 0, 0, -4.5 );
 
-            
-            let metal = 
-                new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.25, 1, 2, 5 );
-            let grass = 
-                new LitMaterial( gl, 
-                'tex/grass_lawn_seamless.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0 );
-            let scale = 
-                new LitMaterial( gl, 'tex/metal_scale.png', gl.LINEAR, 0.25, 1, 2, 4 );
+            let metal = new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.25, 1, 2, 5 );
+            let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
+            let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
+            let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.3, 0.9, 0.1, 1.0);
 
             let sun_dir = ( new Vec4( 1.0, 0.0, 0.0, 0.0 ) ).norm();
             let sun = new Light( sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.95, 0.85, 0 );
@@ -181,7 +195,7 @@ let canvas = document.getElementById( 'the-canvas' );
 
             let scene_root = new Node();
 
-            let platform_mesh = NormalMesh.platform(gl, lit_program, 5, 5, 0, 4, grass);
+            let platform_mesh = NormalMesh.platform(gl, lit_program, 5, 5, 0, 4, ground);
             let platform_node = new Node(platform_mesh);
             scene_root.addChild(platform_node);
 
@@ -190,7 +204,7 @@ let canvas = document.getElementById( 'the-canvas' );
             center_pillar_node.position.y = 1;
             platform_node.addChild(center_pillar_node);
 
-            let arm_mesh = NormalMesh.box(gl, lit_program, 2, 0.3, 0.3, scale);
+            let arm_mesh = NormalMesh.box(gl, lit_program, 2, 0.3, 0.3, metal);
             let arm_node = new Node(arm_mesh);
             arm_node.position.y = 1;
             center_pillar_node.addChild(arm_node);
@@ -205,7 +219,7 @@ let canvas = document.getElementById( 'the-canvas' );
             right_box_node.position.x = 1;
             arm_node.addChild(right_box_node);
 
-            let sphere_mesh = NormalMesh.uv_sphere(gl, lit_program, 0.2, 12, scale);
+            let sphere_mesh = NormalMesh.uv_sphere(gl, lit_program, 0.2, 12, metal);
             let left_sphere_node = new Node(sphere_mesh);
             let right_sphere_node = new Node(sphere_mesh);
             left_box_node.addChild(left_sphere_node);
@@ -220,17 +234,20 @@ let canvas = document.getElementById( 'the-canvas' );
             const SPHERE_ROTATION_SPEED = 2 / DESIRED_TICK_RATE;
             const SPHERE_ORBIT_RADIUS = 0.8;
 
-            let terrain_material = 
-                new LitMaterial(gl, 'tex/grass_lawn_seamless.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
-            let track_material = 
-                new LitMaterial(gl, 'tex/pebbles_seamless.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
 
-            let terrainGen = new TerrainGenerator(gl, lit_program, 100, 128, [terrain_material, track_material]);
-            let terrain_node = terrainGen.createTerrainNode();
-            terrain_node.position.y = -2;
-            scene_root.addChild(terrain_node);
 
-            cam.translate(0, 5, -10);
+            let terrainGen = new TerrainGenerator(gl, lit_program, 20, 128, [sand, ground, snow]);
+            let terrain_root = new Node();
+            scene_root.addChild(terrain_root);
+
+            // Initial terrain generation
+            let initialSegments = terrainGen.updateTerrain({x: 0, y: 0, z: 0});
+            initialSegments.forEach(segment => terrain_root.addChild(segment));
+
+            // Start camera closer to the terrain
+            cam.translate(0, 3, 0);
+            cam.add_pitch(0.05);
+            cam.add_yaw(0.5);
 
             function render( now ) {
                 last_update = now;
@@ -290,6 +307,18 @@ let canvas = document.getElementById( 'the-canvas' );
                        bound_function();
                    }
                 }
+
+                // Update terrain based on camera position - do this every frame
+                let camPos = {x: cam.x, y: cam.y, z: cam.z};
+                let newSegments = terrainGen.updateTerrain(camPos);
+                
+                // Clear existing terrain
+                while(terrain_root.children.length > 0) {
+                    terrain_root.removeChild(terrain_root.children[0]);
+                }
+                
+                // Add new segments
+                newSegments.forEach(segment => terrain_root.addChild(segment));
 
                 arm_rotation += ARM_ROTATION_SPEED;
                 sphere_rotation += SPHERE_ROTATION_SPEED;
