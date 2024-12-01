@@ -155,30 +155,23 @@ class Skybox {
 
     render(gl, projectionMatrix, viewMatrix) {
         const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM);
-        
         gl.useProgram(this.program);
-
-        // Set uniforms
         set_uniform_matrix4(gl, this.program, 'projection', projectionMatrix);
         set_uniform_matrix4(gl, this.program, 'view', viewMatrix);
-
-        // Bind vertex attributes
+        
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         const positionLoc = gl.getAttribLocation(this.program, 'position');
         gl.enableVertexAttribArray(positionLoc);
         gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 0, 0);
-
-        // Bind texture
+        
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.texture);
         const skyboxLoc = gl.getUniformLocation(this.program, 'skybox');
         gl.uniform1i(skyboxLoc, 0);
-
-        // Draw the skybox
+        
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
 
-        // Restore previous program
         gl.useProgram(currentProgram);
     }
 } 

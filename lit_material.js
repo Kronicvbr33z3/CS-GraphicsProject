@@ -16,7 +16,6 @@ class LitMaterial {
         this.specular = specular;
         this.shininess = shininess;
 
-
         const old_tex_binding = gl.getParameter( gl.TEXTURE_BINDING_2D );
         gl.bindTexture( gl.TEXTURE_2D, this.tex );
 
@@ -73,10 +72,7 @@ class LitMaterial {
     bind( gl, program, textureUnit = 0 ) {
         gl.bindTexture( gl.TEXTURE_2D, this.tex );
 
-        // Set the uniform for this specific material's texture unit
         set_uniform_int( gl, program, `tex_${textureUnit}`, textureUnit );
-        
-        // Set material properties with unique names based on texture unit
         set_uniform_scalar( gl, program, `mat_${textureUnit}_ambient`, this.ambient );
         set_uniform_scalar( gl, program, `mat_${textureUnit}_diffuse`, this.diffuse );
         set_uniform_scalar( gl, program, `mat_${textureUnit}_specular`, this.specular );

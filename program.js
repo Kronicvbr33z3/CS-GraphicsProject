@@ -197,6 +197,7 @@ let canvas = document.getElementById( 'the-canvas' );
                 uniform sampler2D tex_1;
                 uniform sampler2D tex_2;
                 uniform int num_materials;
+                uniform int use_color;
 
                 void main( void ) {
                     vec4 tex_color;
@@ -207,7 +208,17 @@ let canvas = document.getElementById( 'the-canvas' );
                     } else {
                         tex_color = texture(tex_2, v_uv);
                     }
-                    f_color = v_color * tex_color;
+                    
+                    // Separate handling for shooting stars vs regular objects
+                    if (use_color == 1) {
+                        // Shooting stars: self-illuminated with controlled alpha
+                        vec3 starColor = v_color.rgb * tex_color.rgb * 0.8; // Reduced brightness
+                        float alpha = tex_color.a * v_color.a * 0.7; // Reduced opacity
+                        f_color = vec4(starColor, alpha);
+                    } else {
+                        // Regular objects: normal lit rendering
+                        f_color = v_color * tex_color;
+                    }
                 }
             `;
 
@@ -262,6 +273,19 @@ let canvas = document.getElementById( 'the-canvas' );
 
             let carNode = null;  // Reference to the car node
             let carPosition = { x: 0, y: -1.8, z: 0 };  // Initial car position
+
+            const NUM_SHOOTING_STARS = 5;
+            let shootingStars = [];
+            let shootingStarsRoot = new Node();
+            scene_root.addChild(shootingStarsRoot);
+
+            // Initialize shooting stars after carPosition is defined
+            for (let i = 0; i < NUM_SHOOTING_STARS; i++) {
+                const star = new ShootingStar(gl, lit_program);
+                star.reset(carPosition); // Now carPosition exists
+                shootingStars.push(star);
+                shootingStarsRoot.addChild(star.node);
+            }
 
             async function loadCarModel() {
                 try {
@@ -325,8 +349,6 @@ let canvas = document.getElementById( 'the-canvas' );
                 gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
 
                 let view = cam.get_view_matrix();
-                
-                // Update projection matrix with larger far plane
                 let aspect = canvas.width / canvas.height;
                 let projection = Mat4.perspective(Math.PI / 4, aspect, 0.1, 10000.0);
                 
@@ -337,25 +359,65 @@ let canvas = document.getElementById( 'the-canvas' );
 
                 let render_jobs = generateRenderJobs( Mat4.identity(), scene_root );
 
-                for( let job of render_jobs ) {
-                    let modelview = view.mul( job.matrix );
+                // First render regular scene
+                gl.disable(gl.BLEND);
+                gl.depthMask(true);
+                
+                // Render regular objects
+                let regular_jobs = render_jobs.filter(job => 
+                    !(job.mesh === shootingStars[0].mesh));
+                
+                for(let job of regular_jobs) {
+                    let modelview = view.mul(job.matrix);
                     
-                    gl.useProgram( current_program );
+                    gl.useProgram(current_program);
                     
-                    set_uniform_matrix4( gl, current_program, 'projection', projection.data );
-                    set_uniform_matrix4( gl, current_program, 'modelview', modelview.data );
-                    set_uniform_matrix4( gl, current_program, 'model', job.matrix.data );
-                    set_uniform_matrix4( gl, current_program, 'view', view.data );
-                    set_uniform_vec3( gl, current_program, 'viewer_loc', cam.x, cam.y, cam.z );
+                    set_uniform_matrix4(gl, current_program, 'projection', projection.data);
+                    set_uniform_matrix4(gl, current_program, 'modelview', modelview.data);
+                    set_uniform_matrix4(gl, current_program, 'model', job.matrix.data);
+                    set_uniform_matrix4(gl, current_program, 'view', view.data);
+                    set_uniform_vec3(gl, current_program, 'viewer_loc', cam.x, cam.y, cam.z);
 
-                    sun.bind( gl, current_program, modelview );
-                    light1.bind( gl, current_program, modelview );
-                    carSpotlight.bind( gl, current_program, modelview );
-                    leftHeadlight.bind( gl, current_program, modelview );
-                    rightHeadlight.bind( gl, current_program, modelview );
+                    sun.bind(gl, current_program, modelview);
+                    light1.bind(gl, current_program, modelview);
+                    carSpotlight.bind(gl, current_program, modelview);
+                    leftHeadlight.bind(gl, current_program, modelview);
+                    rightHeadlight.bind(gl, current_program, modelview);
 
-                    job.mesh.render( gl );
+                    job.mesh.render(gl);
                 }
+
+                // Then render shooting stars with additive blending
+                gl.enable(gl.BLEND);
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // Changed to normal alpha blending
+                gl.depthMask(false);
+
+                let star_jobs = render_jobs.filter(job => 
+                    job.mesh === shootingStars[0].mesh);
+                
+                for(let job of star_jobs) {
+                    let modelview = view.mul(job.matrix);
+                    
+                    gl.useProgram(current_program);
+                    
+                    set_uniform_matrix4(gl, current_program, 'projection', projection.data);
+                    set_uniform_matrix4(gl, current_program, 'modelview', modelview.data);
+                    set_uniform_matrix4(gl, current_program, 'model', job.matrix.data);
+                    set_uniform_matrix4(gl, current_program, 'view', view.data);
+                    
+                    // Don't set any lighting uniforms for stars
+                    set_uniform_vec3(gl, current_program, 'sun_color', 0, 0, 0);
+                    set_uniform_vec3(gl, current_program, 'light1_color', 0, 0, 0);
+                    set_uniform_vec3(gl, current_program, 'light2_color', 0, 0, 0);
+                    set_uniform_vec3(gl, current_program, 'light3_color', 0, 0, 0);
+                    set_uniform_vec3(gl, current_program, 'light4_color', 0, 0, 0);
+
+                    job.mesh.render(gl);
+                }
+
+                // Reset state
+                gl.disable(gl.BLEND);
+                gl.depthMask(true);
             }
 
             const KEYMAP = {
@@ -413,6 +475,12 @@ let canvas = document.getElementById( 'the-canvas' );
                 }
                 
                 newSegments.forEach(segment => terrain_root.addChild(segment));
+
+                // Update shooting stars
+                const deltaTime = 1.0 / DESIRED_TICK_RATE;
+                shootingStars.forEach(star => {
+                    star.update(deltaTime, carPosition);
+                });
 
                 return;
             }

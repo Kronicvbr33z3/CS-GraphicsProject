@@ -77,12 +77,12 @@ class TerrainGenerator {
         const roadHalfWidth = this.roadWidth / 2;
 
         const terrain_node = new Node(NormalMesh.from_heightmap(
-            this.gl, 
-            this.program, 
-            heightmap, 
-            -this.size/2, 
-            this.size/2, 
-            this.materials, 
+            this.gl,
+            this.program,
+            heightmap,
+            -this.size/2,
+            this.size/2,
+            this.materials,
             heightmap.map((row, z) => row.map((h, x) => {
                 const distanceFromCenter = Math.abs(x - centerLine);
                 if (distanceFromCenter < roadHalfWidth) {
