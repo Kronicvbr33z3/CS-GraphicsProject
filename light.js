@@ -1,4 +1,3 @@
-
 class Light {
     /**
      * Construct a light. 
@@ -15,9 +14,9 @@ class Light {
         this.y = y;
         this.z = z;
 
-        this.r = r;
-        this.g = g;
-        this.b = b;
+        this.r = r * 1.2;
+        this.g = g * 1.2;
+        this.b = b * 1.2;
 
         this.light_no = light_no;
     }

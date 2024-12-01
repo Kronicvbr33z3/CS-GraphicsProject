@@ -18,8 +18,11 @@ let canvas = document.getElementById( 'the-canvas' );
                 uniform vec3 light1_loc;
                 uniform vec3 light1_color;
 
-                const float light_attenuation_k = 0.01;
-                const float light_attenuation_l = 0.1;
+                uniform vec3 light2_loc;
+                uniform vec3 light2_color;
+
+                const float light_attenuation_k = 0.005;
+                const float light_attenuation_l = 0.05;
                 const float light_attenuation_q = 0.00; /* no quadratic term for now */
 
                 uniform float mat_0_ambient, mat_1_ambient, mat_2_ambient;
@@ -97,7 +100,7 @@ let canvas = document.getElementById( 'the-canvas' );
                     gl_Position = projection * modelview * vec4( coordinates, 1.0 );
                     vec3 eye_dir = normalize( viewer_loc - coords_tx );
 
-                    vec4 ambient_color = vec4( mat_ambient, mat_ambient, mat_ambient, 1.0 );
+                    vec4 ambient_color = vec4(mat_ambient * 2.0, mat_ambient * 2.0, mat_ambient * 2.0, 1.0);
 
                     float cos_sun_dir_surf_normal = dot( sun_dir, normal_tx );
                     vec3 sun_diffuse_color = diff_color( normal_tx, sun_dir, sun_color, mat_diffuse );
@@ -118,13 +121,26 @@ let canvas = document.getElementById( 'the-canvas' );
                     vec4 color_from_light1 = vec4(
                             ( light1_diffuse_color + light1_spec_color ) * light1_atten, 1.0 );
 
+                    // Add spotlight (light2) calculations
+                    vec3 vector_to_light2 = light2_loc - coords_tx;
+                    vec3 light2_dir = normalize( vector_to_light2 );
+                    float light2_atten = attenuation( vector_to_light2 );
+                
+                    vec3 light2_diffuse_color = diff_color( 
+                        normal_tx, light2_dir, light2_color, mat_diffuse);
+                    vec3 light2_spec_color = spec_color( 
+                        normal_tx, light2_dir, eye_dir, light2_color, mat_specular, mat_shininess );
+                    vec4 color_from_light2 = vec4(
+                            ( light2_diffuse_color + light2_spec_color ) * light2_atten, 1.0 );
+
                     v_color = 
-                        ( 0.0 * color ) + 
-                        ( 1.0 * (
+                        (0.0 * color) + 
+                        (1.2 * (
                             ambient_color +
                             color_from_sun +
-                            color_from_light1
-                        ) );
+                            color_from_light1 +
+                            color_from_light2
+                        ));
                     v_uv = uv;
                     v_material_index = material_index;
                 }
@@ -184,46 +200,62 @@ let canvas = document.getElementById( 'the-canvas' );
             let cam = new Camera();
             cam.translate( 0, 0, -4.5 );
 
-            let metal = new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.25, 1, 2, 5 );
-            let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
-            let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.2, 0.8, 0.05, 1.0);
-            let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.3, 0.9, 0.1, 1.0);
+            let metal = new LitMaterial( gl, 'tex/metal.png', gl.LINEAR, 0.4, 1.0, 0.8, 20 );
+            let sand = new LitMaterial(gl, 'tex/sand.png', gl.LINEAR, 0.3, 0.9, 0.1, 1.0);
+            let ground = new LitMaterial(gl, 'tex/ground.png', gl.LINEAR, 0.3, 0.9, 0.1, 1.0);
+            let snow = new LitMaterial(gl, 'tex/snow.png', gl.LINEAR, 0.4, 1.0, 0.2, 1.0);
 
-            let sun_dir = ( new Vec4( 1.0, 0.0, 0.0, 0.0 ) ).norm();
-            let sun = new Light( sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.95, 0.85, 0 );
-            let light1 = new Light( -9, -9, 0.0, 1.0, 0.2, 0.2, 1 );
+            let sun_dir = (new Vec4(0.5, 1.0, 0.3, 0.0)).norm();
+            let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.95, 0.9, 0);
+            let light1 = new Light(0, 4, 4, 0.8, 0.2, 0.8, 1);
+            let carSpotlight = new Light(0, 4, 4, 1.0, 0.9, 1.0, 2);
 
             let scene_root = new Node();
 
-            let platform_mesh = NormalMesh.platform(gl, lit_program, 5, 5, 0, 4, ground);
-            let platform_node = new Node(platform_mesh);
-            scene_root.addChild(platform_node);
+            async function loadCarModel() {
+                try {
+                    const mtlResponse = await fetch('model/CarritoVaporwave.mtl');
+                    const mtlData = await mtlResponse.text();
+                    
+                    const objResponse = await fetch('model/CarritoVaporwave.obj');
+                    const objData = await objResponse.text();
+                    
+                    // Instead of creating a material with texture, just pass the properties
+                    const defaultMaterialProps = {
+                        ambient: 0.3,
+                        diffuse: 0.1,
+                        specular: 0.3,
+                        shininess: 16
+                    };
+                    
+                    const carMesh = await NormalMesh.from_obj_with_mtl(
+                        gl,
+                        lit_program,
+                        objData,
+                        mtlData,
+                        'model',
+                        defaultMaterialProps
+                    );
+                    
+                    const carNode = new Node(carMesh);
+                    carNode.position = { x: 0, y: -1.8, z: 0 }; 
+                    carNode.scale = { x: 0.3, y: 0.3, z: 0.3 };
+                    carNode.rotation.pitch = -Math.PI / 2;
+                    scene_root.addChild(carNode);
+                    
+                } catch (error) {
+                    console.error('Error loading car model:', error);
+                }
+            }
 
-            let center_pillar_mesh = NormalMesh.box(gl, lit_program, 0.5, 2, 0.5, metal);
-            let center_pillar_node = new Node(center_pillar_mesh);
-            center_pillar_node.position.y = 1;
-            platform_node.addChild(center_pillar_node);
+            let terrainGen = new TerrainGenerator(gl, lit_program, 20, 128, [sand, ground, snow]);
+            let terrain_root = new Node();
+            scene_root.addChild(terrain_root);
 
-            let arm_mesh = NormalMesh.box(gl, lit_program, 2, 0.3, 0.3, metal);
-            let arm_node = new Node(arm_mesh);
-            arm_node.position.y = 1;
-            center_pillar_node.addChild(arm_node);
+            let initialSegments = terrainGen.updateTerrain({x: 0, y: 0, z: 0});
+            initialSegments.forEach(segment => terrain_root.addChild(segment));
 
-            let left_box_mesh = NormalMesh.box(gl, lit_program, 0.5, 0.5, 0.5, metal);
-            let left_box_node = new Node(left_box_mesh);
-            left_box_node.position.x = -1;
-            arm_node.addChild(left_box_node);
-
-            let right_box_mesh = NormalMesh.box(gl, lit_program, 0.5, 0.5, 0.5, metal);
-            let right_box_node = new Node(right_box_mesh);
-            right_box_node.position.x = 1;
-            arm_node.addChild(right_box_node);
-
-            let sphere_mesh = NormalMesh.uv_sphere(gl, lit_program, 0.2, 12, metal);
-            let left_sphere_node = new Node(sphere_mesh);
-            let right_sphere_node = new Node(sphere_mesh);
-            left_box_node.addChild(left_sphere_node);
-            right_box_node.addChild(right_sphere_node);
+            loadCarModel();
 
             let projection = Mat4.perspective_fovx(0.125, 4 / 3, 0.125, 1024);
             let current_program = lit_program;
@@ -233,21 +265,6 @@ let canvas = document.getElementById( 'the-canvas' );
             const ARM_ROTATION_SPEED = 0.5 / DESIRED_TICK_RATE;
             const SPHERE_ROTATION_SPEED = 2 / DESIRED_TICK_RATE;
             const SPHERE_ORBIT_RADIUS = 0.8;
-
-
-
-            let terrainGen = new TerrainGenerator(gl, lit_program, 20, 128, [sand, ground, snow]);
-            let terrain_root = new Node();
-            scene_root.addChild(terrain_root);
-
-            // Initial terrain generation
-            let initialSegments = terrainGen.updateTerrain({x: 0, y: 0, z: 0});
-            initialSegments.forEach(segment => terrain_root.addChild(segment));
-
-            // Start camera closer to the terrain
-            cam.translate(0, 3, 0);
-            cam.add_pitch(0.05);
-            cam.add_yaw(0.5);
 
             function render( now ) {
                 last_update = now;
@@ -273,6 +290,7 @@ let canvas = document.getElementById( 'the-canvas' );
 
                     sun.bind( gl, current_program, modelview );
                     light1.bind( gl, current_program, modelview );
+                    carSpotlight.bind( gl, current_program, modelview );
 
                     job.mesh.render( gl );
                 }
@@ -308,36 +326,14 @@ let canvas = document.getElementById( 'the-canvas' );
                    }
                 }
 
-                // Update terrain based on camera position - do this every frame
                 let camPos = {x: cam.x, y: cam.y, z: cam.z};
                 let newSegments = terrainGen.updateTerrain(camPos);
                 
-                // Clear existing terrain
                 while(terrain_root.children.length > 0) {
                     terrain_root.removeChild(terrain_root.children[0]);
                 }
                 
-                // Add new segments
                 newSegments.forEach(segment => terrain_root.addChild(segment));
-
-                arm_rotation += ARM_ROTATION_SPEED;
-                sphere_rotation += SPHERE_ROTATION_SPEED;
-
-                arm_node.rotation.yaw = arm_rotation;
-
-                left_sphere_node.position = {
-                    x: Math.cos(sphere_rotation) * SPHERE_ORBIT_RADIUS,
-                    y: Math.sin(sphere_rotation) * SPHERE_ORBIT_RADIUS,
-                    z: 0
-                };
-                right_sphere_node.position = {
-                    x: Math.cos(sphere_rotation + Math.PI) * SPHERE_ORBIT_RADIUS,
-                    y: Math.sin(sphere_rotation + Math.PI) * SPHERE_ORBIT_RADIUS,
-                    z: 0
-                };
-
-                left_box_node.rotation.roll += 0.02;
-                right_box_node.rotation.pitch += 0.02;
 
                 return;
             }

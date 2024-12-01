@@ -342,4 +342,161 @@ class NormalMesh {
 
         return new NormalMesh( gl, program, verts, indis, material, false );
     }
+
+    /**
+     * Load a mesh from an OBJ file with MTL materials
+     * @param {WebGLRenderingContext} gl 
+     * @param {WebGLProgram} program
+     * @param {string} objData - The OBJ file contents
+     * @param {string} mtlData - The MTL file contents
+     * @param {string} basePath - Base path for texture loading
+     */
+    static async from_obj_with_mtl(gl, program, objData, mtlData, basePath, defaultMaterialProps = null) {
+        let materials = new Map();
+        let currentMaterial = null;
+        
+        // Parse MTL file
+        const mtlLines = mtlData.split('\n');
+        for (let i = 0; i < mtlLines.length; i++) {
+            const line = mtlLines[i].trim();
+            if (!line || line.startsWith('#')) continue;
+            
+            const parts = line.split(/\s+/);
+            
+            if (line.startsWith('newmtl ')) {
+                const materialName = parts[1];
+                currentMaterial = {
+                    name: materialName,
+                    ambient: [0.2, 0.2, 0.2],
+                    diffuse: [0.8, 0.8, 0.8],
+                    specular: [0.5, 0.5, 0.5],
+                    shininess: 32.0,
+                    diffuseMap: null
+                };
+                materials.set(materialName, currentMaterial);
+            } else if (line.startsWith('Ka ') && currentMaterial) {
+                currentMaterial.ambient = [
+                    parseFloat(parts[1]),
+                    parseFloat(parts[2]),
+                    parseFloat(parts[3])
+                ];
+            } else if (line.startsWith('Kd ') && currentMaterial) {
+                currentMaterial.diffuse = [
+                    parseFloat(parts[1]),
+                    parseFloat(parts[2]),
+                    parseFloat(parts[3])
+                ];
+            } else if (line.startsWith('Ks ') && currentMaterial) {
+                currentMaterial.specular = [
+                    parseFloat(parts[1]),
+                    parseFloat(parts[2]),
+                    parseFloat(parts[3])
+                ];
+            } else if (line.startsWith('Ns ') && currentMaterial) {
+                currentMaterial.shininess = parseFloat(parts[1]);
+            } else if (line.startsWith('map_Kd ') && currentMaterial) {
+                const texturePath = parts[1];
+                const fullPath = `${basePath}/${texturePath}`;
+                
+                // Create material with either the file's properties or default properties
+                currentMaterial.diffuseMap = new LitMaterial(
+                    gl, 
+                    fullPath,
+                    gl.LINEAR,
+                    defaultMaterialProps ? defaultMaterialProps.ambient : 
+                        (currentMaterial.ambient[0] + currentMaterial.ambient[1] + currentMaterial.ambient[2]) / 3,
+                    defaultMaterialProps ? defaultMaterialProps.diffuse :
+                        (currentMaterial.diffuse[0] + currentMaterial.diffuse[1] + currentMaterial.diffuse[2]) / 3,
+                    defaultMaterialProps ? defaultMaterialProps.specular :
+                        (currentMaterial.specular[0] + currentMaterial.specular[1] + currentMaterial.specular[2]) / 3,
+                    defaultMaterialProps ? defaultMaterialProps.shininess : currentMaterial.shininess
+                );
+            }
+        }
+
+        // Parse OBJ file
+        const positions = [];
+        const texCoords = [];
+        const normals = [];
+        const vertices = [];
+        const indices = [];
+        let vertexMap = new Map();
+        let currentMaterialName = null;
+        let vertexCount = 0;
+
+        const objLines = objData.split('\n');
+        for (let i = 0; i < objLines.length; i++) {
+            const line = objLines[i].trim();
+            if (!line || line.startsWith('#')) continue;
+            
+            const parts = line.split(/\s+/);
+
+            if (line.startsWith('v ')) {
+                positions.push([
+                    parseFloat(parts[1]),
+                    parseFloat(parts[2]),
+                    parseFloat(parts[3])
+                ]);
+            } else if (line.startsWith('vt ')) {
+                texCoords.push([
+                    parseFloat(parts[1]),
+                    1.0 - parseFloat(parts[2]) // Flip V coordinate
+                ]);
+            } else if (line.startsWith('vn ')) {
+                normals.push([
+                    parseFloat(parts[1]),
+                    parseFloat(parts[2]),
+                    parseFloat(parts[3])
+                ]);
+            } else if (line.startsWith('usemtl ')) {
+                currentMaterialName = parts[1];
+            } else if (line.startsWith('f ')) {
+                // Process face indices
+                const faceIndices = [];
+                for (let j = 1; j < parts.length; j++) {
+                    const indices = parts[j].split('/');
+                    const vertexKey = parts[j]; // Use the full "v/vt/vn" as key
+                    
+                    if (!vertexMap.has(vertexKey)) {
+                        const posIndex = parseInt(indices[0]) - 1;
+                        const texIndex = indices[1] ? parseInt(indices[1]) - 1 : 0;
+                        const normIndex = indices[2] ? parseInt(indices[2]) - 1 : 0;
+                        
+                        const pos = positions[posIndex];
+                        const tex = texCoords[texIndex] || [0, 0];
+                        const norm = normals[normIndex] || [0, 1, 0];
+                        
+                        // Add vertex data in the format expected by NormalMesh
+                        vertices.push(
+                            pos[0], pos[1], pos[2],           // position
+                            1.0, 1.0, 1.0, 1.0,              // color (white)
+                            tex[0], tex[1],                   // uv
+                            norm[0], norm[1], norm[2],        // normal
+                            materials.has(currentMaterialName) ? Array.from(materials.keys()).indexOf(currentMaterialName) : 0  // material index
+                        );
+                        
+                        vertexMap.set(vertexKey, vertexCount);
+                        faceIndices.push(vertexCount);
+                        vertexCount++;
+                    } else {
+                        faceIndices.push(vertexMap.get(vertexKey));
+                    }
+                }
+                
+                // Triangulate face (assuming convex polygon)
+                for (let j = 1; j < faceIndices.length - 1; j++) {
+                    indices.push(
+                        faceIndices[0],
+                        faceIndices[j],
+                        faceIndices[j + 1]
+                    );
+                }
+            }
+        }
+
+        // Convert materials map to array
+        const materialArray = Array.from(materials.values()).map(m => m.diffuseMap);
+
+        return new NormalMesh(gl, program, vertices, indices, materialArray, false);
+    }
 }
