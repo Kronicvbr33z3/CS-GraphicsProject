@@ -14,9 +14,9 @@ class Light {
         this.y = y;
         this.z = z;
 
-        this.r = r * 1.3;
-        this.g = g * 1.1;
-        this.b = b * 1.4;
+        this.r = r * 2.0;
+        this.g = g * 2.0;
+        this.b = b * 2.0;
 
         this.light_no = light_no;
     }

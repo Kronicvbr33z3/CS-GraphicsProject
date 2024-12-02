@@ -27,6 +27,12 @@ const GOURAUD_VERTEX_SHADER =
                 uniform vec3 light4_loc;
                 uniform vec3 light4_color;
 
+                uniform vec3 light5_loc;
+                uniform vec3 light5_color;
+
+                uniform vec3 light6_loc;
+                uniform vec3 light6_color;
+
                 const float light_attenuation_k = 1.0;
                 const float light_attenuation_l = 0.3;
                 const float light_attenuation_q = 0.2;
@@ -45,6 +51,15 @@ const GOURAUD_VERTEX_SHADER =
                 out vec4 v_color;
                 out vec2 v_uv;
                 out float v_material_index;
+
+                const float HEADLIGHT_CONE_ANGLE = 0.8;  // Wider cone
+                const float HEADLIGHT_FOCUS = 4.0;       // Less sharp falloff
+
+                vec3 directional_attenuation(vec3 light_dir, vec3 light_forward, float cone_angle, float focus) {
+                    float cos_angle = dot(normalize(-light_dir), light_forward);
+                    float falloff = pow(max(cos_angle - (1.0 - cone_angle), 0.0) / cone_angle, focus);
+                    return vec3(falloff);
+                }
 
                 vec3 diff_color( 
                     vec3 normal, 
@@ -144,29 +159,59 @@ const GOURAUD_VERTEX_SHADER =
                     vec4 color_from_light2 = vec4(
                             ( light2_diffuse_color + light2_spec_color ) * light2_atten, 1.0 );
 
-                    // Add headlight (light3) calculations
+                    // Add headlight (light3) calculations with directional cone
                     vec3 vector_to_light3 = light3_loc - coords_tx;
-                    vec3 light3_dir = normalize( vector_to_light3 );
-                    float light3_atten = attenuation( vector_to_light3 );
-                
-                    vec3 light3_diffuse_color = diff_color( 
-                        normal_tx, light3_dir, light3_color, mat_diffuse);
-                    vec3 light3_spec_color = spec_color( 
-                        normal_tx, light3_dir, eye_dir, light3_color, mat_specular, mat_shininess );
-                    vec4 color_from_light3 = vec4(
-                            ( light3_diffuse_color + light3_spec_color ) * light3_atten, 1.0 );
+                    vec3 light3_dir = normalize(vector_to_light3);
+                    float light3_atten = attenuation(vector_to_light3);
+                    vec3 light3_forward = vec3(0.0, 0.0, 1.0); // Points forward (since lights are at back)
+                    vec3 light3_dir_atten = directional_attenuation(vector_to_light3, light3_forward, 
+                                                                       HEADLIGHT_CONE_ANGLE, HEADLIGHT_FOCUS);
 
-                    // Add headlight (light4) calculations
+                    vec3 light3_diffuse_color = diff_color(
+                        normal_tx, light3_dir, light3_color, mat_diffuse);
+                    vec3 light3_spec_color = spec_color(
+                        normal_tx, light3_dir, eye_dir, light3_color, mat_specular, mat_shininess);
+                    vec4 color_from_light3 = vec4(
+                        (light3_diffuse_color + light3_spec_color) * light3_atten * light3_dir_atten, 1.0);
+
+                    // Add headlight (light4) calculations with directional cone
                     vec3 vector_to_light4 = light4_loc - coords_tx;
-                    vec3 light4_dir = normalize( vector_to_light4 );
-                    float light4_atten = attenuation( vector_to_light4 );
-                
-                    vec3 light4_diffuse_color = diff_color( 
+                    vec3 light4_dir = normalize(vector_to_light4);
+                    float light4_atten = attenuation(vector_to_light4);
+                    vec3 light4_forward = vec3(0.0, 0.0, 1.0); // Points forward (since lights are at back)
+                    vec3 light4_dir_atten = directional_attenuation(vector_to_light4, light4_forward, 
+                                                                       HEADLIGHT_CONE_ANGLE, HEADLIGHT_FOCUS);
+
+                    vec3 light4_diffuse_color = diff_color(
                         normal_tx, light4_dir, light4_color, mat_diffuse);
-                    vec3 light4_spec_color = spec_color( 
-                        normal_tx, light4_dir, eye_dir, light4_color, mat_specular, mat_shininess );
+                    vec3 light4_spec_color = spec_color(
+                        normal_tx, light4_dir, eye_dir, light4_color, mat_specular, mat_shininess);
                     vec4 color_from_light4 = vec4(
-                            ( light4_diffuse_color + light4_spec_color ) * light4_atten, 1.0 );
+                        (light4_diffuse_color + light4_spec_color) * light4_atten * light4_dir_atten, 1.0);
+
+                    // Add rearlight (light5) calculations
+                    vec3 vector_to_light5 = light5_loc - coords_tx;
+                    vec3 light5_dir = normalize(vector_to_light5);
+                    float light5_atten = attenuation(vector_to_light5);
+
+                    vec3 light5_diffuse_color = diff_color(
+                        normal_tx, light5_dir, light5_color, mat_diffuse);
+                    vec3 light5_spec_color = spec_color(
+                        normal_tx, light5_dir, eye_dir, light5_color, mat_specular, mat_shininess);
+                    vec4 color_from_light5 = vec4(
+                        (light5_diffuse_color + light5_spec_color) * light5_atten, 1.0);
+
+                    // Add rearlight (light6) calculations
+                    vec3 vector_to_light6 = light6_loc - coords_tx;
+                    vec3 light6_dir = normalize(vector_to_light6);
+                    float light6_atten = attenuation(vector_to_light6);
+
+                    vec3 light6_diffuse_color = diff_color(
+                        normal_tx, light6_dir, light6_color, mat_diffuse);
+                    vec3 light6_spec_color = spec_color(
+                        normal_tx, light6_dir, eye_dir, light6_color, mat_specular, mat_shininess);
+                    vec4 color_from_light6 = vec4(
+                        (light6_diffuse_color + light6_spec_color) * light6_atten, 1.0);
 
                     v_color = 
                         (0.0 * color) + 
@@ -176,7 +221,9 @@ const GOURAUD_VERTEX_SHADER =
                             color_from_light1 +
                             color_from_light2 +
                             color_from_light3 +
-                            color_from_light4
+                            color_from_light4 +
+                            color_from_light5 +
+                            color_from_light6
                         ));
                     v_uv = uv;
                     v_material_index = material_index;
@@ -266,8 +313,10 @@ let sun_dir = (new Vec4(0.2, 0.3, 0.5, 0.0)).norm();
 let sun = new Light(sun_dir.x, sun_dir.y, sun_dir.z, 1.0, 0.4, 0.6, 0);
 let light1 = new Light(0, 4, 4, 0.6, 0.2, 0.8, 1);
 let carSpotlight = new Light(0, 4, 4, 0.8, 0.2, 1.0, 2);
-let leftHeadlight = new Light(-0.4, -1.2, -15, 0.8, 0.7, 0.2, 3);
-let rightHeadlight = new Light(0.4, -1.2, -15, 0.8, 0.7, 0.2, 4);
+let leftHeadlight = new Light(-0.4, -1.2, 0, 3.0, 2.6, 0.6, 3);  // Much brighter yellow headlight
+let rightHeadlight = new Light(0.4, -1.2, 0, 3.0, 2.6, 0.6, 4);  // Much brighter yellow headlight
+let leftRearlight = new Light(-0.4, -1.2, 0, 1.6, 0.4, 2.0, 5);  // Keep purple/blue rearlight brightness
+let rightRearlight = new Light(0.4, -1.2, 0, 1.6, 0.4, 2.0, 6);  // Keep purple/blue rearlight brightness
 
 let scene_root = new Node();
 
@@ -375,6 +424,11 @@ const ARM_ROTATION_SPEED = 0.5 / DESIRED_TICK_RATE;
 const SPHERE_ROTATION_SPEED = 2 / DESIRED_TICK_RATE;
 const SPHERE_ORBIT_RADIUS = 0.8;
 
+// Adjust swivel animation variables
+let rearLightSwivel = 0;
+const REAR_LIGHT_SWIVEL_SPEED = 2.0;
+const REAR_LIGHT_SWIVEL_RANGE = 1.2;
+
 function render(now) {
     last_update = now;
 
@@ -417,6 +471,8 @@ function render(now) {
         carSpotlight.bind(gl, current_program, modelview);
         leftHeadlight.bind(gl, current_program, modelview);
         rightHeadlight.bind(gl, current_program, modelview);
+        leftRearlight.bind(gl, current_program, modelview);
+        rightRearlight.bind(gl, current_program, modelview);
 
         // Check if job.mesh is an object with mesh and material properties
         if (job.mesh.mesh && job.mesh.material) {
@@ -445,12 +501,16 @@ function render(now) {
         set_uniform_matrix4(gl, current_program, 'model', job.matrix.data);
         set_uniform_matrix4(gl, current_program, 'view', view.data);
 
-
-        set_uniform_vec3(gl, current_program, 'sun_color', 0, 0, 0);
-        set_uniform_vec3(gl, current_program, 'light1_color', 0, 0, 0);
-        set_uniform_vec3(gl, current_program, 'light2_color', 0, 0, 0);
-        set_uniform_vec3(gl, current_program, 'light3_color', 0, 0, 0);
-        set_uniform_vec3(gl, current_program, 'light4_color', 0, 0, 0);
+        // Only disable lighting for shooting stars, not for everything
+        if (job.mesh === shootingStars[0].mesh) {
+            set_uniform_vec3(gl, current_program, 'sun_color', 0, 0, 0);
+            set_uniform_vec3(gl, current_program, 'light1_color', 0, 0, 0);
+            set_uniform_vec3(gl, current_program, 'light2_color', 0, 0, 0);
+            set_uniform_vec3(gl, current_program, 'light3_color', 0, 0, 0);
+            set_uniform_vec3(gl, current_program, 'light4_color', 0, 0, 0);
+            set_uniform_vec3(gl, current_program, 'light5_color', 0, 0, 0);
+            set_uniform_vec3(gl, current_program, 'light6_color', 0, 0, 0);
+        }
 
         job.mesh.render(gl);
     }
@@ -487,6 +547,29 @@ function update() {
         carPosition.z += CAR_SPEED_PER_FRAME;
         carNode.position = carPosition;
 
+        // Update rear light swivel animation
+        rearLightSwivel = Math.sin(now * REAR_LIGHT_SWIVEL_SPEED * 0.003) * REAR_LIGHT_SWIVEL_RANGE;
+        const leftRearLightOffset = 1.2 * Math.sin(rearLightSwivel);  // Left light swivel
+        const rightRearLightOffset = 1.2 * Math.sin(rearLightSwivel + Math.PI);  // Right light swivel (opposite phase)
+
+        // Update rear light positions with opposite swivel effects
+        leftRearlight.x = carPosition.x - 0.4 + leftRearLightOffset;
+        leftRearlight.y = carPosition.y - 1.2;
+        leftRearlight.z = carPosition.z - 1.5;
+
+        rightRearlight.x = carPosition.x + 0.4 + rightRearLightOffset;
+        rightRearlight.y = carPosition.y - 1.2;
+        rightRearlight.z = carPosition.z - 1.5;
+
+        // Update headlight positions (now behind car)
+        leftHeadlight.x = carPosition.x - 0.4;
+        leftHeadlight.y = carPosition.y - 1.2;
+        leftHeadlight.z = carPosition.z + 1.5; // Position behind car (+1.5 means 1.5 units behind)
+
+        rightHeadlight.x = carPosition.x + 0.4;
+        rightHeadlight.y = carPosition.y - 1.2;
+        rightHeadlight.z = carPosition.z + 1.5; // Position behind car (+1.5 means 1.5 units behind)
+
         // Update statue columns
         const visibleDistance = VISIBLE_STATUE_DISTANCE;
         const currentSegment = Math.floor(carPosition.z / STATUE_SPACING);
@@ -513,21 +596,11 @@ function update() {
             });
         });
 
-        leftHeadlight.x = carPosition.x - 0.4;
-        leftHeadlight.y = carPosition.y - 1.2;
-        leftHeadlight.z = carPosition.z + 6.0;
-
-        rightHeadlight.x = carPosition.x + 0.4;
-        rightHeadlight.y = carPosition.y - 1.2;
-        rightHeadlight.z = carPosition.z + 6.0;
-
         cam.warp(
             carPosition.x,
             carPosition.y + 3.5,
             carPosition.z - 8.5
         );
-
-
 
 
     }

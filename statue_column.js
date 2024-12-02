@@ -1,6 +1,8 @@
 class StatueColumn {
     static columnMesh = null;
     static statueMesh = null;
+    static sphereMesh = null;
+    static sphereMaterial = null;
     static loadPromise = null;
 
     static async initializeResources(gl, program) {
@@ -28,6 +30,30 @@ class StatueColumn {
                         })
                     ]);
 
+                    // Initialize sphere material if not already created
+                    if (!this.sphereMaterial) {
+                        this.sphereMaterial = new LitMaterial(
+                            gl, 
+                            'tex/grid.png', 
+                            gl.LINEAR, 
+                            0.6,    // increased ambient
+                            0.8,    // reduced diffuse
+                            1.0,    // max specular
+                            64.0    // much higher shininess for a more metallic look
+                        );
+                    }
+
+                    // Initialize sphere mesh if not already created
+                    if (!this.sphereMesh) {
+                        this.sphereMesh = NormalMesh.uv_sphere(
+                            gl, 
+                            program, 
+                            0.15,  // radius
+                            24,    // subdivisions
+                            this.sphereMaterial
+                        );
+                    }
+
                     // Create a simple material for the column
                     let columnMaterial = new LitMaterial(
                         gl, 
@@ -42,7 +68,7 @@ class StatueColumn {
                     console.log('Creating column mesh...');
                     this.columnMesh = await NormalMesh.from_obj(
                         gl, 
-                        program, 
+                        program,
                         columnData, 
                         [columnMaterial]
                     );
@@ -101,6 +127,18 @@ class StatueColumn {
         this.columnNode = new Node(StatueColumn.columnMesh);
         this.statueNode = new Node(StatueColumn.statueMesh);
 
+        // Create orbiting spheres - smaller radius and closer orbit
+        this.orbitRadius = 1.2;
+        this.orbitSpeed = 4.0;    // Much faster speed
+        this.sphereNodes = [];
+        
+        // Create two orbiting spheres using the cached mesh
+        for (let i = 0; i < 2; i++) {
+            const sphereNode = new Node(StatueColumn.sphereMesh);
+            this.sphereNodes.push(sphereNode);
+            this.root.addChild(sphereNode);
+        }
+
         this.root.addChild(this.columnNode);
         this.columnNode.addChild(this.statueNode);
 
@@ -108,17 +146,39 @@ class StatueColumn {
         this.columnNode.position = { x: 0, y: -2.2, z: 0 }; 
         
         this.statueNode.scale = { x: 25, y: 25, z: 25  };
-        this.statueNode.position = { x: 0, y: 1000, z: 0 }; // Raise the statue
+        this.statueNode.position = { x: 0, y: 1000, z: 0 };
         
         this.statueNode.rotation = {
             pitch: Math.PI / 2,
             yaw: 0,
             roll: 0
         };
+
+        // Set initial sphere positions
+        this.sphereTime = 0;
+        this.updateSpherePositions(0);
+    }
+    
+    updateSpherePositions(deltaTime) {
+        this.sphereTime += deltaTime * this.orbitSpeed;
+        
+        // Update positions for each sphere, with opposite directions
+        this.sphereNodes.forEach((sphereNode, index) => {
+            // Multiply by -1 for first sphere to go in opposite direction
+            const direction = index === 0 ? -1 : 1;
+            const angle = this.sphereTime * direction + (index * Math.PI);
+            
+            sphereNode.position = {
+                x: Math.cos(angle) * this.orbitRadius,
+                y: 1.5,
+                z: Math.sin(angle) * this.orbitRadius
+            };
+        });
     }
     
     update(deltaTime) {
         this.statueNode.rotation.pitch = (this.statueNode.rotation.pitch || -Math.PI / 2) - deltaTime * 0.3;
+        this.updateSpherePositions(deltaTime);
     }
     
     setPosition(x, y, z) {
