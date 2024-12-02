@@ -93,28 +93,23 @@ class StatueColumn {
     }
 
     constructor(gl, program) {
-        // Only create meshes once and reuse them
         if (!StatueColumn.columnMesh) {
             StatueColumn.initializeResources(gl, program);
         }
         
         this.root = new Node();
-        // Reuse the static meshes instead of creating new ones
         this.columnNode = new Node(StatueColumn.columnMesh);
         this.statueNode = new Node(StatueColumn.statueMesh);
 
         this.root.addChild(this.columnNode);
         this.columnNode.addChild(this.statueNode);
+
+        this.columnNode.scale = { x: 0.003, y: 0.005, z: 0.003 };
+        this.columnNode.position = { x: 0, y: -2.2, z: 0 }; 
         
-        // Reduce column scale by half and lower its position
-        this.columnNode.scale = { x: 0.0025, y: 0.005, z: 0.0025 };
-        this.columnNode.position = { x: 0, y: -2.2, z: 0 }; // Lower the column
-        
-        // Adjust statue scale and position to be on top of column
-        this.statueNode.scale = { x: 20, y: 20, z: 20  };
+        this.statueNode.scale = { x: 25, y: 25, z: 25  };
         this.statueNode.position = { x: 0, y: 1000, z: 0 }; // Raise the statue
         
-        // Initial rotation to face the road
         this.statueNode.rotation = {
             pitch: Math.PI / 2,
             yaw: 0,
@@ -123,7 +118,6 @@ class StatueColumn {
     }
     
     update(deltaTime) {
-        // Slower rotation for more majestic movement, reversed direction
         this.statueNode.rotation.pitch = (this.statueNode.rotation.pitch || -Math.PI / 2) - deltaTime * 0.3;
     }
     

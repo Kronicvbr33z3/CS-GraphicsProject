@@ -60,12 +60,10 @@ class ShootingStar {
     update(deltaTime, carPosition) {
         if (!this.active) return;
 
-        // Update position
         this.position.x += this.velocity.x * deltaTime;
         this.position.y += this.velocity.y * deltaTime;
         this.position.z += this.velocity.z * deltaTime;
 
-        // Update node position and rotation
         this.node.position = this.position;
         this.node.rotation.yaw = Math.atan2(this.velocity.x, this.velocity.z);
         this.node.rotation.pitch = Math.atan2(this.velocity.y,

@@ -2,8 +2,56 @@
 <html>
 
 <head>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <title>Term Project</title>
     <style>
-        body {}
+        body {
+            background: linear-gradient(45deg, #ff61d5, #7e33ff);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        .title-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title {
+            font-family: 'Press Start 2P', cursive;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff,
+                        0 0 20px #ff61d5;
+            font-size: 2.5em;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .subtitle {
+            font-family: 'Press Start 2P', cursive;
+            color: #ff61d5;
+            text-shadow: 0 0 5px #ff61d5;
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        @keyframes gradient {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
 
         canvas {
             width: 800;
@@ -17,17 +65,29 @@
         }
 
         #the-canvas {
-            border: 1px solid darkblue;
+            border: 2px solid #00ffff;
+            margin: 20px;
+            box-shadow: 0 0 20px #ff61d5,
+                       0 0 40px #7e33ff;
         }
 
         #user-matrix input {
             width: 64px;
             font-size: 24px;
         }
+
+        ::selection {
+            background: #ff61d5;
+            color: white;
+        }
     </style>
 </head>
 
 <body>
+    <div class="title-container">
+        <h1 class="title">Term Project</h1>
+        <h2 class="subtitle">Luis Gonzalez</h2>
+    </div>
     <canvas id="the-canvas" width="1280" height="720"></canvas>
     <script src="lib.js"></script>
     <script src="vector.js"></script>

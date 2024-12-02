@@ -51,10 +51,6 @@ class Camera {
 
         this.translate_vec(txed);
 
-        // note: this is wrong:
-        // this.x += strafe;
-        // this.y += up;
-        // this.z += forward;
     }
 
     translate(x, y, z) {
