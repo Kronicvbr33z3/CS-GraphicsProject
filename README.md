@@ -4,7 +4,11 @@ Used WEBGL directly and implemented all features.
 
 # Preview 
 
-[1](tex/preview.mp4)
+
+
+https://github.com/user-attachments/assets/359656e1-897a-4820-aac9-ada232b0faa1
+
+
 
 # Features
 
